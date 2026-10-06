@@ -180,7 +180,6 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
     <div id="dev" class="hidden"><label>Micro<select id="micsel"></select></label><label id="spkrow">Loa / tai nghe<select id="spksel"></select></label></div>
     <div id="fxp" class="hidden">
       <label class="sw"><span>Làm đẹp da<small>Chỉ làm mịn vùng da, giữ nét mắt môi tóc</small></span><input id="beauty" type="checkbox"><i></i></label>
-      <label class="sw"><span>Làm đẹp khuôn mặt<small>Thon mặt, mắt to, môi và má hồng</small></span><input id="beauty2" type="checkbox"><i></i></label>
       <div id="lkchips"></div>
       <label class="sw" style="gap:10px"><span style="flex:none">Cường độ<small>Độ đậm của bộ lọc</small></span><input id="lkamt" type="range" min="10" max="100" step="5" style="position:static;opacity:1;pointer-events:auto"></label>
       <div class="frow"><span>Nền</span></div>
@@ -210,7 +209,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 </div>
 
 <script id="fxw" type="javascript/worker">
-let MPV, fs, seg, ges, inv, lastTs = 0, cpu = false, face, fIni = false, faceUrl = "";
+let MPV, fs, seg, ges, inv, lastTs = 0, cpu = false;
 const tsn = () => (lastTs = Math.max(performance.now(), lastTs + 1));
 async function getBuf(url) {
   try {
@@ -233,14 +232,7 @@ async function mk(cls, url, opts) {
   const m = await MPV[cls].createFromOptions(fs, { baseOptions: { modelAssetBuffer, delegate }, canvas, runningMode: "VIDEO", ...opts });
   return [m, delegate];
 }
-async function initFace() {
-  if (face || fIni || !faceUrl || !fs) return; fIni = true;
-  try { const r = await mk("FaceLandmarker", faceUrl, { numFaces: 1 }); face = r[0]; postMessage({ t: "ready", k: "face", d: r[1] }); }
-  catch (e) { postMessage({ t: "err", k: "face", gpu: !cpu, m: String(e && e.message || e) }); }
-  fIni = false;
-}
 onmessage = async ({ data: d }) => {
-  if (d.t === "face") { faceUrl = d.url; initFace(); return; }
   if (d.t === "init") {
     cpu = !!d.cpu;
     try {
@@ -256,7 +248,6 @@ onmessage = async ({ data: d }) => {
       const r = await mk("ImageSegmenter", d.seg, { outputConfidenceMasks: true, outputCategoryMask: false });
       seg = r[0]; postMessage({ t: "ready", k: "seg", d: r[1] });
     } catch (e) { postMessage({ t: "err", k: "seg", gpu: !cpu, m: String(e && e.message || e) }); }
-    initFace();
     return;
   }
   if (d.t !== "frame") return;
@@ -281,14 +272,6 @@ onmessage = async ({ data: d }) => {
       const r = ges.recognizeForVideo(d.bmp, tsn());
       out.hands = r.landmarks.map(h => h.map(p => [p.x, p.y]));
       out.cats = r.gestures.map(g => g[0] ? [g[0].categoryName, g[0].score] : ["", 0]);
-    } catch (e) {}
-  }
-  if (d.face && face) { // chỉ gửi 16 số (mắt, cằm, má, mũi, môi) thay vì 478 điểm
-    try {
-      const l = face.detectForVideo(d.bmp, tsn()).faceLandmarks[0];
-      if (l) { const a = l[468], b = l[473], ch = l[152], cl = l[234], cr = l[454], n = l[1], lt = l[0], lb = l[17], ml = l[61], mr = l[291];
-        out.face = [a.x, a.y, b.x, b.y, ch.x, ch.y, cl.x, cl.y, cr.x, cr.y, n.x, n.y, (ml.x + mr.x) / 2, (lt.y + lb.y) / 2, Math.abs(mr.x - ml.x) / 2, Math.abs(lb.y - lt.y) / 2]; }
-      else out.face = 0;
     } catch (e) {}
   }
   try { d.bmp.close(); } catch (e) {}
@@ -389,7 +372,7 @@ function cleanAudio(track) {
 async function getMedia(strict) {
   localStream?.getTracks().forEach(t => t.stop());
   rawMic?.stop(); rawMic = null; stopPipe(); rawCam?.stop(); rawCam = null;
-  const v = { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } };
+  const v = { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } };
   const a = { ...AUDIO_C }; if (micId) a.deviceId = { ideal: micId };
   const tries = strict ? [{ video: v, audio: a }] : [{ video: v, audio: a }, { video: false, audio: a }, { video: v, audio: false }];
   let s = null;
@@ -460,7 +443,6 @@ navigator.mediaDevices?.addEventListener?.("devicechange", () => {
    Nhận diện + tách nền chạy trong Web Worker (không làm đơ hình), mô hình tải sẵn và lưu cache. */
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const SEG_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
-const FACE_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 const GES_URL = "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
 const LOOKS = [ // [tên, gain RGB, sat | lift RGB, contrast | bloom, vignette, grain, exposure | tint tối RGB | tint sáng RGB]
   ["off", "Gốc"],
@@ -475,19 +457,19 @@ const LOOKS = [ // [tên, gain RGB, sat | lift RGB, contrast | bloom, vignette, 
   ["cyber", "🌃 Neon", 1, .95, 1.1, 1.35, 0, 0, 0, 1.15, .35, .3, 0, 0, .05, -.02, .08, -.02, .05, .06],
   ["noir", "🖤 Đen trắng", 1, 1, 1, 0, 0, 0, 0, 1.25, 0, .4, .05, 0, 0, 0, 0, 0, 0, 0],
 ];
-const FX = { smooth: 0, bg: "off", gest: true, face: false, look: "off", la: 80 };   // cử chỉ luôn tự động; làm mịn da chỉ bật/tắt (độ mịn cố định)
+const FX = { smooth: 0, bg: "off", gest: true, look: "off", la: 80 };   // cử chỉ luôn tự động; làm mịn da chỉ bật/tắt (độ mịn cố định)
 const BEAUTY = 75;
 try {
   const s = JSON.parse(localStorage.getItem("vcall-fx") || "{}") || {};
-  FX.smooth = +s.smooth > 0 ? BEAUTY : 0; FX.bg = s.bg; FX.face = !!s.face; if (LOOKS.some(l => l[0] === s.look)) FX.look = s.look; if (+s.la >= 10 && +s.la <= 100) FX.la = +s.la;
+  FX.smooth = +s.smooth > 0 ? BEAUTY : 0; FX.bg = s.bg; if (LOOKS.some(l => l[0] === s.look)) FX.look = s.look; if (+s.la >= 10 && +s.la <= 100) FX.la = +s.la;
 } catch {} if (!["off", "blur", "green", "dark"].includes(FX.bg)) FX.bg = "off";
-let pipe = null, fxSeq = 0, fwCpu = false, fw = null, fwBusy = 0, fwSt = { ges: false, seg: false, dead: false }, anaOn = false, anaId = 0, lastSend = 0, lastHand = 0, faceAsked = false, lastFaceT = 0;
+let pipe = null, fxSeq = 0, fwCpu = false, fw = null, fwBusy = 0, fwSt = { ges: false, seg: false, dead: false }, anaOn = false, anaId = 0, lastSend = 0, lastHand = 0;
 const mkCv = () => document.createElement("canvas");
-const needPix = () => FX.smooth > 0 || FX.bg !== "off" || FX.face || FX.look !== "off";
+const needPix = () => FX.smooth > 0 || FX.bg !== "off" || FX.look !== "off";
 const fxSay = t => { $("fxstat").textContent = t; };
-const saveFx = () => { try { localStorage.setItem("vcall-fx", JSON.stringify({ smooth: FX.smooth, bg: FX.bg, face: FX.face, look: FX.look, la: FX.la })); } catch {} };
+const saveFx = () => { try { localStorage.setItem("vcall-fx", JSON.stringify({ smooth: FX.smooth, bg: FX.bg, look: FX.look, la: FX.la })); } catch {} };
 function syncFxUI() {
-  $("beauty").checked = FX.smooth > 0; $("beauty2").checked = FX.face; $("lkamt").value = FX.la;
+  $("beauty").checked = FX.smooth > 0; $("lkamt").value = FX.la;
   document.querySelectorAll("#lkchips button").forEach(b => b.classList.toggle("on", b.dataset.lk === FX.look));
   document.querySelectorAll("#bgchips button").forEach(b => b.classList.toggle("on", b.dataset.bg === FX.bg));
   $("fxbtn").classList.toggle("act", needPix());
@@ -517,25 +499,17 @@ function onFw({ data: d }) {
     fwSt[d.k] = true;
     if (d.k === "ges") fxSay("Cử chỉ tự động đã sẵn sàng.");
     if (d.k === "seg" && FX.bg !== "off") fxSay("Đã bật.");
-    if (d.k === "face") fxSay("Đã bật làm đẹp khuôn mặt.");
   } else if (d.t === "err") {
     if (d.gpu && !fwCpu) { // GPU trong worker không chạy được → dựng lại worker ở chế độ CPU (vẫn không chặn hình)
-      fwCpu = true; try { fw.terminate(); } catch {} fw = null; fwBusy = 0; fwSt = { ges: false, seg: false, face: false, dead: false }; faceAsked = false; fxInit(); if (FX.face) askFace(); return;
+      fwCpu = true; try { fw.terminate(); } catch {} fw = null; fwBusy = 0; fwSt = { ges: false, seg: false, dead: false }; fxInit(); return;
     }
-    if (d.k === "face") { FX.face = false; saveFx(); applyFx(); fxSay("Không bật được làm đẹp khuôn mặt: " + String(d.m).slice(0, 70)); return; }
     if (d.k === "seg") { if (FX.bg !== "off") { FX.bg = "off"; saveFx(); applyFx(); } fxSay("Không bật được tách nền: " + String(d.m).slice(0, 70)); }
     else { fwSt.dead = true; fxSay("Cử chỉ chưa chạy được: " + String(d.m).slice(0, 70)); }
   } else if (d.t === "res") {
     fwBusy = 0;
     if (d.mask && pipe) setMask(pipe, d);
     if (d.hands) onHands(d);
-    if (d.face !== undefined && pipe) setFace(pipe, d.face);
   }
-}
-function askFace() { if (!fw || faceAsked || fwSt.face) return; faceAsked = true; fw.postMessage({ t: "face", url: FACE_URL }); fxSay("Đang tải mô hình khuôn mặt…"); }
-function setFace(P, f) { // có hysteresis: mất mặt >4 lần liên tiếp mới tắt hiệu ứng, tránh chớp
-  if (!f) { if (++P.miss > 4) P.fT = 0; return; }
-  P.miss = 0; P.LT.set(f); if (!P.fT) P.LC.set(f); P.fT = 1;
 }
 function anaLoop(id) {
   const v = $("srcvid"), f = () => { if (id !== anaId || !anaOn) return; anaLoop(id); anaStep(); };
@@ -546,18 +520,18 @@ async function anaStep() {
   const t = performance.now(), v = $("srcvid");
   if (fwBusy && t - fwBusy > 4000) fwBusy = 0;           // worker kẹt thì gỡ khóa
   if (fwBusy || !fw || document.hidden || v.readyState < 2 || !v.videoWidth) return;
-  const seg = FX.bg !== "off" && fwSt.seg && !!pipe, hand = FX.gest && fwSt.ges && t - lastHand >= 90, face = FX.face && fwSt.face && !!pipe && t - lastFaceT >= 45;
-  if (!seg && !hand && !face) return;
-  if (!hand && !face && t - lastSend < 30) return;
-  fwBusy = lastSend = t; if (hand) lastHand = t; if (face) lastFaceT = t;
+  const seg = FX.bg !== "off" && fwSt.seg && !!pipe, hand = FX.gest && fwSt.ges && t - lastHand >= 150;
+  if (!seg && !hand) return;
+  if (!hand && t - lastSend < 40) return;
+  fwBusy = lastSend = t; if (hand) lastHand = t;
   const w = 384, h = Math.max(1, Math.round(w * v.videoHeight / v.videoWidth));
   if (anaCv.width !== w || anaCv.height !== h) { anaCv.width = w; anaCv.height = h; }
   anaCx.drawImage(v, 0, 0, w, h);
-  try { const bmp = await createImageBitmap(anaCv); fw.postMessage({ t: "frame", bmp, seg, hand, face, asp: w / h }, [bmp]); }
+  try { const bmp = await createImageBitmap(anaCv); fw.postMessage({ t: "frame", bmp, seg, hand, asp: w / h }, [bmp]); }
   catch { fwBusy = 0; }
 }
 function anaSync() {
-  const want = (FX.gest || FX.bg !== "off" || FX.face) && !!rawCam;
+  const want = (FX.gest || FX.bg !== "off") && !!rawCam;
   if (want && !anaOn) { anaOn = true; anaLoop(++anaId); }
   else if (!want && anaOn) { anaOn = false; anaId++; }
 }
@@ -593,7 +567,7 @@ const FS = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
 uniform sampler2D F, M0, M1;
-uniform float sm, hasM, mt, ba, fa, la, gt; uniform vec4 K[5]; uniform int bg; uniform vec2 px; uniform vec2 L[8];
+uniform float sm, hasM, mt, ba, la, gt; uniform vec4 K[5]; uniform int bg; uniform vec2 px;
 vec3 grad(vec2 u, int k) {
   float r = length((u - vec2(.5, .42)) * vec2(1., .9));
   vec3 a = k == 2 ? vec3(.12, .48, .34) : vec3(.2, .255, .29);
@@ -607,66 +581,20 @@ float skinOf(vec3 m) {
   return smoothstep(.27, .32, cb) * (1. - smoothstep(.49, .54, cb)) * smoothstep(.49, .53, cr) * (1. - smoothstep(.66, .70, cr)) * smoothstep(.15, .3, Y);
 }
 void main() {
-  float smx = max(sm, fa * .6); vec2 uv = vUv; float ar = px.y / px.x; vec2 asp = vec2(ar, 1.);
-  float ey = (L[0].y + L[1].y) * .5, hw = max(abs(L[4].x - L[3].x) * .5, .01), cx = (L[3].x + L[4].x) * .5;
-  if (fa > .001) {
-    float ed = length((L[1] - L[0]) * asp);
-    for (int i = 0; i < 2; i++) {
-      vec2 e = L[i];
-      float r = length((uv - e) * asp / ed / vec2(.30, .21));
-      float w = 1. - smoothstep(0., 1., r);
-      uv = e + (uv - e) * (1. - vec2(.10, .24) * w * fa);
-    }
-    float t = (uv.y - ey) / max(L[2].y - ey, .01), dx = uv.x - cx, a = abs(dx) / hw;
-    float bell = smoothstep(.4, .75, t) * (1. - smoothstep(.95, 1.1, t));
-    float bump = smoothstep(0., .7, a) * (1. - smoothstep(1., 1.6, a));
-    float chin = smoothstep(.75, 1., t) * (1. - smoothstep(1.02, 1.2, t)) * (1. - smoothstep(.2, .7, a));
-    uv.x += sign(dx) * (.13 * bell * bump + .10 * chin * smoothstep(0., .3, a)) * hw * fa;
-    uv.y += .035 * hw * chin * fa;
-  }
+  vec2 uv = vUv; float ar = px.y / px.x;
   vec3 c = texture(F, uv).rgb;
   float sk = 0.;
-  if (smx > 0. || fa > .001) sk = skinOf(textureLod(F, uv, 3.).rgb);
-  if (smx > 0. && sk > .01) {
+  if (sm > 0.) sk = skinOf(textureLod(F, uv, 3.).rgb);
+  if (sk > .01) {
     float R = 9. / (px.y * 720.);
     vec3 acc = c; float ws = 1.;
-    for (int i = 0; i < 20; i++) {
-      float an = float(i) * 2.39996, rr = sqrt((float(i) + .5) / 20.) * R;
-      vec3 s = textureLod(F, uv + vec2(cos(an), sin(an)) * rr * px, 0.).rgb, d = s - c;
+    for (int i = 0; i < 8; i++) {
+      float an = float(i) * 2.39996, rr = sqrt((float(i) + .5) / 8.) * R;
+      vec3 s = textureLod(F, uv + vec2(cos(an), sin(an)) * rr * px, 1.).rgb, d = s - c;
       float w = exp(-dot(d, d) * 45.); acc += s * w; ws += w;
     }
-    c = mix(c, acc / ws, sk * smx);
-    c = pow(c, vec3(1. - .16 * sk * smx, 1. - .13 * sk * smx, 1. - .09 * sk * smx));
-  }
-  if (fa > .001) {
-    float ed2 = max(length((L[1] - L[0]) * asp), .01), W = hw * 2. * ar, fh = max(L[2].y - ey, .01);
-    float fm = 1. - smoothstep(.65, 1.05, length((uv - vec2(cx, ey + fh * .42)) / vec2(hw * 1.05, fh * .95)));
-    c = pow(c, vec3(1. - .12 * fm * sk * fa));
-    float blush = 0.;
-    for (int i = 3; i < 5; i++) {
-      vec2 bc = vec2(mix(L[i].x, L[5].x, .5), mix(ey, L[5].y, .85));
-      vec2 q = (uv - bc) * asp / (W * vec2(.23, .13));
-      blush = max(blush, exp(-2. * dot(q, q)));
-    }
-    vec2 br = (uv - vec2(cx, ey + (L[5].y - ey) * .3)) * asp / (W * vec2(.2, .07));
-    blush = max(blush, .55 * exp(-2. * dot(br, br)));
-    c = mix(c, c * vec3(1.04, .80, .85) + vec3(.06, .005, .025), blush * (.35 + .65 * sk) * .95 * fa);
-    vec2 nq = (uv - L[5]) * asp / (W * .07);
-    float nose = exp(-2. * dot(nq, nq));
-    c = mix(c, c * vec3(1.03, .88, .9) + vec3(.03, .0, .01), nose * .5 * fa);
-    vec2 d = (uv - L[6]) / (L[7] + .0005);
-    float lm = (1. - smoothstep(.55, 1., dot(d, d))) * smoothstep(.05, .16, c.r - c.g);
-    c = mix(c, c * vec3(1.1, .74, .84) + vec3(.07, .0, .02), lm * (.55 + .3 * (1. - smoothstep(0., 1., dot(d, d)))) * fa);
-    vec2 g = (uv - (L[6] + vec2(0., L[7].y * .38))) / (L[7] * vec2(.38, .2) + .0005);
-    c += exp(-2. * dot(g, g)) * lm * .24 * fa;
-    for (int i = 0; i < 2; i++) {   // mắt long lanh: viền mống mắt đậm + điểm sáng
-      vec2 q = (uv - L[i]) * asp / ed2;
-      float rr = length(q);
-      c *= 1. - .28 * smoothstep(.06, .095, rr) * (1. - smoothstep(.105, .135, rr)) * fa;
-      vec2 hq = (q - vec2(-.03, -.035)) / .022;
-      c += exp(-dot(hq, hq)) * .35 * fa;
-    }
-    c = clamp(c, 0., 1.);
+    c = mix(c, acc / ws, sk * sm);
+    c = pow(c, vec3(1. - .16 * sk * sm, 1. - .13 * sk * sm, 1. - .09 * sk * sm));
   }
   if (bg > 0 && hasM > .5) {
     float m = smoothstep(.4, .7, mix(texture(M0, uv).r, texture(M1, uv).r, mt));
@@ -697,7 +625,7 @@ void main() {
 function startPipe() {
   if (pipe) return pipe.track;
   setSrc();
-  const cv = mkCv(), gl = cv.getContext("webgl2", { alpha: false, antialias: false, desynchronized: true, powerPreference: "high-performance" });
+  const cv = mkCv(), gl = cv.getContext("webgl2", { alpha: false, antialias: false, desynchronized: true, powerPreference: "low-power" });
   if (!gl) throw new Error("no webgl2");
   const sh = (t, src) => { const x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
   const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
@@ -714,10 +642,10 @@ function startPipe() {
   gl.uniform1i(gl.getUniformLocation(pr, "F"), 0); gl.uniform1i(gl.getUniformLocation(pr, "M0"), 1); gl.uniform1i(gl.getUniformLocation(pr, "M1"), 2);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   const U = n => gl.getUniformLocation(pr, n);
-  const v = $("srcvid"), kk = Math.min(1, 1280 / Math.max(v.videoWidth || 1280, v.videoHeight || 720));
+  const v = $("srcvid"), kk = Math.min(1, 960 / Math.max(v.videoWidth || 960, v.videoHeight || 720));
   cv.width = Math.max(2, Math.round((v.videoWidth || 1280) * kk)); cv.height = Math.max(2, Math.round((v.videoHeight || 720) * kk)); gl.viewport(0, 0, cv.width, cv.height); // cỡ hình cố định, không đổi giữa chừng
-  const P = pipe = { on: true, cv, gl, ft, m0, m1, mw: 0, mh: 0, haveMask: false, mAt: 0, mDt: 90, ba: 0, mip: false, LT: new Float32Array(16), LC: new Float32Array(16), fT: 0, fA: 0, miss: 0, lk: null, K: new Float32Array(20), max: 1280, good: 0, cnt: 0, t0: 0,
-    u: { la: U("la"), K: U("K"), gt: U("gt"), fa: U("fa"), L: U("L"), sm: U("sm"), hasM: U("hasM"), mt: U("mt"), ba: U("ba"), bg: U("bg"), px: U("px") } };
+  const P = pipe = { on: true, cv, gl, ft, m0, m1, mw: 0, mh: 0, haveMask: false, mAt: 0, mDt: 90, ba: 0, mip: false, lk: null, K: new Float32Array(20), max: 1280, good: 0, cnt: 0, t0: 0,
+    u: { la: U("la"), K: U("K"), gt: U("gt"), sm: U("sm"), hasM: U("hasM"), mt: U("mt"), ba: U("ba"), bg: U("bg"), px: U("px") } };
   P.track = cv.captureStream().getVideoTracks()[0];
   if ("contentHint" in P.track) P.track.contentHint = "motion";
   const tick = () => { if (!P.on) return; try { frame(P, v); } catch {} next(); };
@@ -734,7 +662,7 @@ function stopPipe() {
 function frame(P, v) {
   if (v.readyState < 2 || !v.videoWidth) return;
   const gl = P.gl, vw = v.videoWidth, vh = v.videoHeight;
-  const bgOn = FX.bg !== "off" && P.haveMask, LK = LOOKS.find(l => l[0] === FX.look), mip = FX.smooth > 0 || FX.face || FX.bg === "blur" || (LK && LK[10] > 0), now = performance.now();
+  const bgOn = FX.bg !== "off" && P.haveMask, LK = LOOKS.find(l => l[0] === FX.look), mip = FX.smooth > 0 || FX.bg === "blur" || (LK && LK[10] > 0), now = performance.now();
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, P.ft);
   if (P.mip !== mip) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR); P.mip = mip; }
   if (P.vw !== vw || P.vh !== vh) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v); P.vw = vw; P.vh = vh; }
@@ -746,9 +674,6 @@ function frame(P, v) {
   gl.uniform1f(P.u.hasM, bgOn ? 1 : 0);
   gl.uniform1f(P.u.mt, Math.min(1, (now - P.mAt) / (P.mDt * .7)));
   gl.uniform1f(P.u.ba, P.ba);
-  P.fA += ((FX.face && P.fT ? 1 : 0) - P.fA) * .15; if (P.fA < .004) P.fA = 0;   // mờ dần khi mất mặt
-  if (P.fA > 0) { for (let i = 0; i < 16; i++) P.LC[i] += (P.LT[i] - P.LC[i]) * .4; gl.uniform2fv(P.u.L, P.LC); }   // làm mượt tọa độ giữa các lần nhận diện
-  gl.uniform1f(P.u.fa, P.fA);
   if (LK && LK.length > 2) { if (P.lk !== LK) { P.lk = LK; const a = LK.slice(2); P.K.set([...a.slice(0, 12), a[12], a[13], a[14], 0, a[15], a[16], a[17], 0]); gl.uniform4fv(P.u.K, P.K); } gl.uniform1f(P.u.la, FX.la / 100); } else gl.uniform1f(P.u.la, 0);
   gl.uniform1f(P.u.gt, (now % 1000) / 7.3);
   gl.uniform2f(P.u.px, 1 / vw, 1 / vh);
@@ -830,17 +755,15 @@ async function applyFx() {
   syncFxUI();
   if (!localStream || !rawCam) { if (needPix()) fxSay("Cần có camera để dùng hiệu ứng."); return; }
   fxInit();
-  if (FX.face) askFace();
   setSrc();
   if (needPix()) { await vidReady($("srcvid")); if (seq !== fxSeq || !rawCam) return; }
   if (FX.bg !== "off" && !fwSt.seg && !fwSt.dead) fxSay("Đang tải mô hình nền…");
   try { if (needPix()) setVideoTrack(startPipe()); else { stopPipe(); setVideoTrack(rawCam); } }
-  catch { stopPipe(); FX.smooth = 0; FX.bg = "off"; FX.face = false; FX.look = "off"; saveFx(); syncFxUI(); setVideoTrack(rawCam); fxSay("Thiết bị không hỗ trợ hiệu ứng hình (cần WebGL2)."); }
+  catch { stopPipe(); FX.smooth = 0; FX.bg = "off"; FX.look = "off"; saveFx(); syncFxUI(); setVideoTrack(rawCam); fxSay("Thiết bị không hỗ trợ hiệu ứng hình (cần WebGL2)."); }
   anaSync();
   if (FX.bg !== "off" && fwSt.seg) fxSay("Đã bật.");
 }
 $("fxbtn").onclick = () => { $("dev").classList.add("hidden"); $("fxp").classList.toggle("hidden"); pokeUI(); };
-$("beauty2").onchange = e => { FX.face = e.target.checked; saveFx(); applyFx(); };
 $("beauty").onchange = e => { FX.smooth = e.target.checked ? BEAUTY : 0; saveFx(); applyFx(); };
 $("lkchips").innerHTML = LOOKS.map(l => `<button data-lk="${l[0]}">${l[1]}</button>`).join("");
 document.querySelectorAll("#lkchips button").forEach(b => b.onclick = () => { FX.look = b.dataset.lk; saveFx(); applyFx(); });
