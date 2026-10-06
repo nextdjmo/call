@@ -593,7 +593,7 @@ const FS = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
 uniform sampler2D F, M0, M1;
-uniform float sm, hasM, mt, ba, fa, la, gt; uniform vec4 K[5]; uniform int bg; uniform vec2 px; uniform vec2 L[8]; // L: mắt, mắt, cằm, má, má, mũi, tâm môi, nửa kích thước môi
+uniform float sm, hasM, mt, ba, fa, la, gt; uniform vec4 K[5]; uniform int bg; uniform vec2 px; uniform vec2 L[8];
 vec3 grad(vec2 u, int k) {
   float r = length((u - vec2(.5, .42)) * vec2(1., .9));
   vec3 a = k == 2 ? vec3(.12, .48, .34) : vec3(.2, .255, .29);
@@ -601,46 +601,60 @@ vec3 grad(vec2 u, int k) {
   vec3 c = k == 2 ? vec3(.016, .063, .043) : vec3(.02, .027, .04);
   return r < .4 ? mix(a, b, r / .4) : mix(b, c, clamp((r - .4) / .4, 0., 1.));
 }
+float skinOf(vec3 m) {
+  float Y = dot(m, vec3(.299, .587, .114));
+  float cb = .5 - .169 * m.r - .331 * m.g + .5 * m.b, cr = .5 + .5 * m.r - .419 * m.g - .081 * m.b;
+  return smoothstep(.27, .32, cb) * (1. - smoothstep(.49, .54, cb)) * smoothstep(.49, .53, cr) * (1. - smoothstep(.66, .70, cr)) * smoothstep(.15, .3, Y);
+}
 void main() {
-  vec2 uv = vUv; float ar = px.y / px.x;
-  if (fa > .001) { // biến dạng nhẹ: mắt to, thon hàm (lấy mẫu từ vị trí đã dịch)
-    float er = length((L[1] - L[0]) * vec2(ar, 1.)) * .26;
+  vec2 uv = vUv; float ar = px.y / px.x; vec2 asp = vec2(ar, 1.);
+  float ey = (L[0].y + L[1].y) * .5, hw = max(abs(L[4].x - L[3].x) * .5, .01), cx = (L[3].x + L[4].x) * .5;
+  if (fa > .001) {
+    float ed = length((L[1] - L[0]) * asp);
     for (int i = 0; i < 2; i++) {
-      vec2 e = L[i]; float r = length((uv - e) * vec2(ar, 1.)) / er;
-      if (r < 1.) uv = e + (uv - e) * (1. - .24 * fa * (1. - r * r));
+      vec2 e = L[i];
+      float r = length((uv - e) * asp / ed / vec2(.30, .21));
+      float w = 1. - smoothstep(0., 1., r);
+      uv = e + (uv - e) * (1. - vec2(.07, .17) * w * fa);
     }
-    vec2 cc = (L[3] + L[4]) * .5; float hw = max(abs(L[4].x - L[3].x) * .5, .01), ey = (L[0].y + L[1].y) * .5;
-    float t = (uv.y - ey) / max(L[2].y - ey, .01), dx = uv.x - cc.x;
-    uv.x = cc.x + dx * (1. + .11 * fa * smoothstep(.45, .9, t) * (1. - smoothstep(1., 1.12, t)) * (1. - smoothstep(1., 1.7, abs(dx) / hw)));
+    float t = (uv.y - ey) / max(L[2].y - ey, .01), dx = uv.x - cx, a = abs(dx) / hw;
+    float bell = smoothstep(.4, .75, t) * (1. - smoothstep(.95, 1.1, t));
+    float bump = smoothstep(0., .7, a) * (1. - smoothstep(1., 1.6, a));
+    uv.x += sign(dx) * .09 * hw * bell * bump * fa;
   }
   vec3 c = texture(F, uv).rgb;
-  if (sm > 0.) { // làm đẹp: chỉ làm mịn vùng DA (nhận bằng màu), giữ nét mắt/môi/tóc/viền
-    vec3 m = textureLod(F, uv, 3.).rgb;                       // màu đã làm mờ để mặt nạ da ổn định, không lốm đốm
-    float Y = dot(m, vec3(.299, .587, .114));
-    float cb = .5 - .169 * m.r - .331 * m.g + .5 * m.b, cr = .5 + .5 * m.r - .419 * m.g - .081 * m.b;
-    float sk = smoothstep(.27, .32, cb) * (1. - smoothstep(.49, .54, cb)) * smoothstep(.49, .53, cr) * (1. - smoothstep(.66, .70, cr)) * smoothstep(.15, .3, Y);
-    if (sk > .01) {
-      float R = 9. / (px.y * 720.);                          // bán kính theo độ phân giải
-      vec3 acc = c; float ws = 1.;
-      for (int i = 0; i < 20; i++) {                         // bilateral: pha màu gần giống nhau, bỏ qua chỗ khác biệt lớn (viền)
-        float an = float(i) * 2.39996, rr = sqrt((float(i) + .5) / 20.) * R;
-        vec3 s = textureLod(F, uv + vec2(cos(an), sin(an)) * rr * px, 0.).rgb, d = s - c;
-        float w = exp(-dot(d, d) * 45.); acc += s * w; ws += w;
-      }
-      c = mix(c, acc / ws, sk * sm);
-      c = pow(c, vec3(1. - .16 * sk * sm, 1. - .13 * sk * sm, 1. - .09 * sk * sm)); // da sáng, hơi hồng ấm
+  float sk = 0.;
+  if (sm > 0. || fa > .001) sk = skinOf(textureLod(F, uv, 3.).rgb);
+  if (sm > 0. && sk > .01) {
+    float R = 9. / (px.y * 720.);
+    vec3 acc = c; float ws = 1.;
+    for (int i = 0; i < 20; i++) {
+      float an = float(i) * 2.39996, rr = sqrt((float(i) + .5) / 20.) * R;
+      vec3 s = textureLod(F, uv + vec2(cos(an), sin(an)) * rr * px, 0.).rgb, d = s - c;
+      float w = exp(-dot(d, d) * 45.); acc += s * w; ws += w;
     }
+    c = mix(c, acc / ws, sk * sm);
+    c = pow(c, vec3(1. - .16 * sk * sm, 1. - .13 * sk * sm, 1. - .09 * sk * sm));
   }
-  if (fa > .001) { // môi hồng, má hồng
-    vec2 d = (uv - L[6]) / (L[7] * vec2(1.1, 1.2) + .001);
-    float lm = (1. - smoothstep(.55, 1., length(d))) * (.4 + .6 * smoothstep(.2, .32, c.r - c.g));
-    c = mix(c, c * vec3(1.12, .82, .9) + vec3(.04, 0., .01), lm * .55 * fa);
-    float rad = max(abs(L[4].x - L[3].x) * ar * .25, .01);
+  if (fa > .001) {
+    float W = hw * 2. * ar, fh = max(L[2].y - ey, .01);
+    float fm = 1. - smoothstep(.65, 1.05, length((uv - vec2(cx, ey + fh * .42)) / vec2(hw * 1.05, fh * .95)));
+    c = pow(c, vec3(1. - .07 * fm * sk * fa));
+    float blush = 0.;
     for (int i = 3; i < 5; i++) {
-      vec2 bc = mix(L[i], L[5], .5) + vec2(0., rad * .4);
-      float bl = exp(-1.5 * pow(length((uv - bc) * vec2(ar, 1.)) / rad, 2.));
-      c = mix(c, c * vec3(1.05, .92, .95) + vec3(.035, 0., .01), bl * .4 * fa);
+      vec2 bc = vec2(mix(L[i].x, L[5].x, .5), mix(ey, L[5].y, .85));
+      vec2 q = (uv - bc) * asp / (W * vec2(.2, .11));
+      blush = max(blush, exp(-2.2 * dot(q, q)));
     }
+    c = mix(c, c * vec3(1.04, .80, .85) + vec3(.06, .005, .025), blush * (.35 + .65 * sk) * .8 * fa);
+    vec2 nq = (uv - L[5]) * asp / (W * .07);
+    float nose = exp(-2. * dot(nq, nq));
+    c = mix(c, c * vec3(1.03, .88, .9) + vec3(.03, .0, .01), nose * .5 * fa);
+    vec2 d = (uv - L[6]) / (L[7] + .0005);
+    float lm = (1. - smoothstep(.55, 1., dot(d, d))) * smoothstep(.05, .16, c.r - c.g);
+    c = mix(c, c * vec3(1.1, .74, .84) + vec3(.07, .0, .02), lm * .62 * fa);
+    vec2 g = (uv - (L[6] + vec2(0., L[7].y * .38))) / (L[7] * vec2(.38, .2) + .0005);
+    c += exp(-2. * dot(g, g)) * lm * .16 * fa;
     c = clamp(c, 0., 1.);
   }
   if (bg > 0 && hasM > .5) {
@@ -654,7 +668,7 @@ void main() {
     } else back = grad(uv, bg);
     c = mix(c, mix(back, c, m), ba);
   }
-  if (la > 0.) { // bộ lọc màu: cân trắng, nâng đen, bão hòa, tương phản, tách tông, glow, vignette, hạt phim
+  if (la > 0.) {
     vec3 g0 = c;
     c *= exp2(K[2].w) * K[0].rgb;
     c += K[1].rgb * (1. - c);
@@ -709,7 +723,7 @@ function stopPipe() {
 function frame(P, v) {
   if (v.readyState < 2 || !v.videoWidth) return;
   const gl = P.gl, vw = v.videoWidth, vh = v.videoHeight;
-  const bgOn = FX.bg !== "off" && P.haveMask, LK = LOOKS.find(l => l[0] === FX.look), mip = FX.smooth > 0 || FX.bg === "blur" || (LK && LK[10] > 0), now = performance.now();
+  const bgOn = FX.bg !== "off" && P.haveMask, LK = LOOKS.find(l => l[0] === FX.look), mip = FX.smooth > 0 || FX.face || FX.bg === "blur" || (LK && LK[10] > 0), now = performance.now();
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, P.ft);
   if (P.mip !== mip) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR); P.mip = mip; }
   if (P.vw !== vw || P.vh !== vh) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v); P.vw = vw; P.vh = vh; }
