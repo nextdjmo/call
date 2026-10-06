@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050a08">
+<title>Gọi video cho hai đứa</title>
+<link rel="preconnect" href="https://0.peerjs.com">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--pink-1:#FF8DA1;--blue-1:#8CC2FF;--yel-1:#F0CB85;--gold:#6FD4A4;--bg:#050a08;--ink:#EDEEF2;--mut:rgba(237,238,242,.62);
+--glass:rgba(14,24,19,.55);--line:rgba(255,255,255,.12);--red:#E5484D;--b:42px;--ease:cubic-bezier(.2,.8,.2,1);--t:240ms;
+--f-title:"Cormorant Garamond",Georgia,serif;--f-body:"Inter",system-ui,sans-serif}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-weight:500;overscroll-behavior:none}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.hidden{display:none!important}
+button{font:inherit;cursor:pointer;color:var(--ink);border:0;background:none;transition:transform var(--t) var(--ease),background var(--t),opacity var(--t)}
+button:active{transform:scale(.92)}
+button:disabled{opacity:.35;cursor:default}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes pp{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes fl{0%{opacity:0;transform:translate(-50%,-30%) scale(.4)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-110%) scale(1)}}
+#top,#zoomctl,#bar,#react,#status,#tray,#hint,.fxcap,#stk,#msg{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+/* Trang chủ */
+#home{position:relative;overflow:hidden;min-height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:28px 20px;gap:14px;text-align:center;background:radial-gradient(60% 45% at 50% 22%,rgba(111,212,164,.16),transparent 70%),var(--bg)}
+.mark{width:56px;height:56px;border-radius:50%;border:1px solid rgba(111,212,164,.5);display:grid;place-items:center;color:var(--gold);font-size:22px;box-shadow:0 0 40px rgba(111,212,164,.18)}
+#home h1{font-family:var(--f-title);font-weight:600;font-size:clamp(36px,9vw,56px);line-height:1.05}
+#home p{max-width:360px;line-height:1.6;font-size:14px;color:var(--mut)}
+.box{width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:24px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#name,#code,#msg{font:inherit;font-size:16px;height:48px;padding:0 18px;border-radius:14px;color:var(--ink);text-align:center;transition:border-color var(--t)}
+#name,#code{border:1px solid var(--line);background:rgba(255,255,255,.06)}
+#name::placeholder,#code::placeholder,#msg::placeholder{color:var(--mut)}
+#name:focus,#code:focus,#msg:focus{outline:none;border-color:var(--gold)}
+.main{height:48px;border-radius:14px;color:#07130d;font-weight:600;font-size:16px;background:linear-gradient(135deg,#A6EBC9,#34A876);box-shadow:0 8px 24px rgba(52,168,118,.3)}
+.ghost{min-height:40px;font-size:13px;color:var(--mut);text-decoration:underline}
+#err{color:var(--pink-1);font-size:13px;min-height:16px}
+/* Màn hình gọi */
+#call{position:fixed;left:0;right:0;top:0;height:100%;background:radial-gradient(80% 60% at 50% 40%,#0e1a15,var(--bg));overflow:hidden;touch-action:none}
+#call::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 100% at 50% 50%,transparent 55%,rgba(0,0,0,.55))}
+#remote{will-change:transform;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) translate(var(--px,0px),var(--py,0px)) scale(var(--z,1));touch-action:none;width:240px;height:320px;object-fit:contain;opacity:0;pointer-events:none;transition:opacity .6s ease}
+#remote.on{opacity:1;pointer-events:auto}
+#remote.pip{left:12px;top:calc(124px + env(safe-area-inset-top));transform:none!important;border-radius:16px;border:1px solid var(--line);background:#000;z-index:2;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#screen{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;transform:translate(var(--px,0px),var(--py,0px)) scale(var(--z,1));touch-action:none}
+#novideo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:24px;color:var(--mut);font-size:14px}
+#novideo::before{content:"🐰💕🐻";font-size:52px;animation:bob 2.4s ease-in-out infinite}
+#novideo b{font-family:var(--f-title);font-size:28px;font-weight:600;color:var(--ink)}
+#local{position:absolute;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:3;width:clamp(96px,26vw,168px);aspect-ratio:3/4;object-fit:cover;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:#111;transform:scaleX(-1);box-shadow:0 10px 30px rgba(0,0,0,.55)}
+#local.back{transform:none}
+#local{touch-action:manipulation}
+#call.swap #local{left:0;right:0;top:0;width:100%;height:100%;aspect-ratio:auto!important;border-radius:0;border:0;box-shadow:none;z-index:1;object-fit:cover}
+#call.swap #remote{left:auto!important;right:12px;top:calc(12px + env(safe-area-inset-top))!important;transform:none!important;width:clamp(96px,26vw,168px)!important;height:auto!important;aspect-ratio:var(--ra,3/4);object-fit:cover;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:#111;z-index:3;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+#call.swap #zoomctl,#call.swap #hint{display:none}
+@media(min-width:900px){#local{width:clamp(160px,13vw,240px)}}
+#hint{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));padding:6px 14px;border-radius:999px;font-size:12px;color:var(--mut);white-space:nowrap;pointer-events:none;z-index:4;animation:pp .35s var(--ease)}
+#status{position:absolute;left:50%;top:38%;transform:translateX(-50%);width:min(86%,320px);text-align:center;padding:16px 20px;border-radius:20px;pointer-events:none;transition:opacity .4s;z-index:4}
+#status b{display:block;font-family:var(--f-title);font-size:24px;font-weight:600;margin-bottom:2px}
+#status span{font-size:13px;color:var(--mut)}
+#status.gone{opacity:0}
+.ui{transition:opacity .35s ease,transform .35s ease}
+.ui.away{opacity:0;pointer-events:none}
+#hud{position:absolute;left:12px;top:calc(12px + env(safe-area-inset-top));z-index:4;display:flex;flex-direction:column;gap:8px;align-items:flex-start;max-width:calc(100% - 150px)}
+#top{display:flex;align-items:center;gap:8px;height:40px;padding:0 4px 0 14px;border-radius:999px;max-width:100%}
+#q{flex:none;width:8px;height:8px;border-radius:50%;background:#777}
+#q.good{background:#5ED18A;box-shadow:0 0 8px #5ED18A}#q.mid{background:var(--yel-1)}#q.bad{background:#FF6B81}
+#peername{font-size:13px;max-width:30vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#copy{display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;font-size:12px;background:rgba(255,255,255,.1);white-space:nowrap}
+#copy svg{width:14px;height:14px}
+#devbtn,#fxbtn{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1)}
+#devbtn svg,#fxbtn svg{width:16px;height:16px}
+#dev,#fxp{display:flex;flex-direction:column;gap:10px;width:min(100%,260px);padding:12px;border-radius:18px;font-size:12px;color:var(--mut);background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+#fxbtn.act{background:var(--gold);color:#07130d}
+.frow{display:flex;justify-content:space-between;color:var(--ink);font-size:12px}
+#fxp .rng{width:100%;flex:none}
+#bgchips,#lkchips{display:flex;gap:6px;flex-wrap:wrap}
+#lkamt{width:100%;accent-color:var(--gold)}
+#bgchips button,#lkchips button{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);font-size:12px}
+#bgchips button.on,#lkchips button.on{background:var(--gold);color:#07130d;border-color:transparent}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ink);cursor:pointer}
+.sw small{display:block;color:var(--mut);font-size:11px;margin-top:2px}
+.sw input{position:absolute;opacity:0;pointer-events:none}
+.sw i{flex:none;width:40px;height:24px;border-radius:99px;background:rgba(255,255,255,.18);position:relative;transition:background .2s}
+.sw i::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s var(--ease)}
+.sw input:checked+i{background:var(--gold)}
+.sw input:checked+i::after{transform:translateX(16px)}
+.sw input:focus-visible+i{outline:2px solid var(--gold);outline-offset:2px}
+#fxstat{min-height:14px;font-size:11px;color:var(--mut)}
+#gesthint{display:flex;flex-direction:column;gap:4px;color:var(--ink);font-size:12px;font-weight:600}
+#gesthint span{font-size:16px;letter-spacing:1px;font-weight:400;line-height:1.4}
+@media(max-width:479px){#copylbl{display:none}#copy{padding:0;width:32px;justify-content:center}#peername{max-width:22vw;min-width:0}}
+#dev label{display:flex;flex-direction:column;gap:4px}
+#dev select{font:inherit;font-size:13px;height:36px;padding:0 8px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--ink);width:100%}
+#dev select option{color:#000}
+#zoomctl{display:flex;align-items:center;gap:8px;height:40px;width:min(100%,220px);padding:0 4px 0 12px;border-radius:999px;color:var(--mut)}
+.rng{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:28px;margin:0;padding:0;border:0;background:transparent;cursor:pointer;touch-action:none}
+.rng::-webkit-slider-runnable-track{height:3px;border-radius:9px;background:rgba(255,255,255,.22)}
+.rng::-moz-range-track{height:3px;border-radius:9px;background:rgba(255,255,255,.22)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6.5px;border-radius:50%;background:var(--gold);border:0;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.rng::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--gold);border:0}
+#zlbl{min-width:42px;height:32px;padding:0 8px;border-radius:999px;background:rgba(255,255,255,.1);font-size:12px;font-variant-numeric:tabular-nums}
+#bar{position:absolute;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 16px);bottom:calc(14px + env(safe-area-inset-bottom));z-index:4;display:flex;gap:4px;padding:6px;border-radius:999px}
+#bar.away{transform:translateY(12px)}
+#bar button{width:var(--b);height:var(--b);border-radius:50%;display:grid;place-items:center;position:relative}
+#bar button:hover{background:rgba(255,255,255,.12)}
+.sl{opacity:0}
+#mic.off .sl,#cam.off .sl{opacity:1}
+#mic.off,#cam.off{background:rgba(229,72,77,.9)!important;color:#fff}
+#chatbtn.off,#share.off,#reactbtn.act{background:rgba(111,212,164,.92)!important;color:#07130d}
+#bar #end{width:calc(var(--b)*1.35);background:var(--red);color:#fff}
+#end svg{transform:rotate(135deg)}
+#chatbtn.dot::after{content:"";position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--gold);border:2px solid #0e1813}
+#react{position:absolute;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 16px);bottom:calc(76px + env(safe-area-inset-bottom));z-index:4;display:flex;gap:2px;padding:6px;border-radius:999px;opacity:0;pointer-events:none;transform:translateY(8px)}
+#react.open{opacity:1;pointer-events:auto;transform:none}
+#react.open.away{opacity:0;pointer-events:none}
+#react button{width:40px;height:40px;border-radius:50%;font-size:22px;display:grid;place-items:center}
+#react button:hover{background:rgba(255,255,255,.12)}
+@media(min-width:600px){:root{--b:48px}#bar{gap:6px;padding:8px}#react{bottom:calc(88px + env(safe-area-inset-bottom))}#react button{width:44px;height:44px;font-size:24px}}
+/* Nhắn tin */
+#chat{position:absolute;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));max-height:55%;z-index:4;display:flex;flex-direction:column;gap:8px;justify-content:flex-end;pointer-events:none}
+#chatup{min-height:0;display:flex;flex-direction:column;gap:8px;justify-content:flex-end;transition:margin .25s var(--ease)}
+#call:has(#react.open) #chatup{margin-bottom:64px}
+#call:has(#chat:not(.hidden)) #react{bottom:calc(128px + env(safe-area-inset-bottom))}
+#call:has(#tray:not(.hidden)) #react{opacity:0;pointer-events:none}
+@media(min-width:600px){#chat{left:auto;width:380px;right:16px;bottom:calc(88px + env(safe-area-inset-bottom))}#call:has(#react.open) #chatup{margin-bottom:70px}#call:has(#chat:not(.hidden)) #react{bottom:calc(142px + env(safe-area-inset-bottom))}}
+#msgs{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;pointer-events:auto;padding:2px 6px 2px 2px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+.m{max-width:82%;padding:8px 13px;border-radius:16px;font-size:14px;line-height:1.4;word-break:break-word;white-space:pre-wrap;border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:pp .25s var(--ease)}
+.m.me{align-self:flex-end;background:rgba(111,212,164,.18);border-color:rgba(111,212,164,.4);border-bottom-right-radius:4px}
+.m.them{align-self:flex-start;background:rgba(14,24,19,.6);border-bottom-left-radius:4px}
+.m small{display:block;color:var(--mut);font-size:11px;margin-bottom:2px}
+.m.st{background:none!important;border:0;backdrop-filter:none;padding:0;font-size:56px;line-height:1.1}
+.m.st img{height:104px;max-width:60vw;object-fit:contain;display:block}
+#row{display:flex;gap:8px;pointer-events:auto}
+#msg{flex:1;min-width:0;text-align:left;height:44px;border-radius:999px}
+#send,#stk{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center}
+#send{background:linear-gradient(135deg,#A6EBC9,#34A876);color:#07130d}
+#tray{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px;max-height:168px;overflow-y:auto;border-radius:18px;padding:8px;pointer-events:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+#tray button{background:rgba(255,255,255,.07);border-radius:12px;height:46px;font-size:26px;padding:0;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+#tray img{max-width:38px;max-height:38px;object-fit:contain;pointer-events:none}
+#addst{font-size:22px!important;color:var(--gold)!important;border:1px dashed rgba(111,212,164,.5)!important}
+#pop{position:absolute;left:50%;top:38%;font-size:110px;pointer-events:none;z-index:5;animation:fl 2.2s ease-out forwards}
+#pop img{height:180px;max-width:70vw;object-fit:contain;display:block}
+/* Hiệu ứng cảm xúc */
+#fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:6}
+.fxi{position:absolute;left:0;top:0;line-height:1;will-change:transform,opacity;white-space:nowrap}
+.fxt{font-family:var(--f-title);font-style:italic;font-weight:600;text-shadow:0 4px 24px rgba(0,0,0,.7)}
+.fxcap{position:absolute;left:50%;transform:translateX(-50%);top:calc(130px + env(safe-area-inset-top));padding:7px 16px;border-radius:999px;font-size:13px;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="home">
+  <div class="mark" aria-hidden="true">♥</div>
+  <h1>Gọi video cho hai đứa</h1>
+  <p>Nhập một mã phòng bất kỳ, gửi link cho người ấy, hai người vào cùng mã là gặp nhau. Không có camera hay mic vẫn nhắn tin được.</p>
+  <div class="box">
+    <input id="name" placeholder="Tên của bạn" maxlength="20" autocomplete="nickname">
+    <input id="code" placeholder="Mã phòng, ví dụ: tinhyeu" maxlength="30" autocapitalize="off" autocomplete="off">
+    <button class="main" id="join">Vào phòng</button>
+    <button class="ghost" id="rand">Tạo mã ngẫu nhiên</button>
+    <div id="err"></div>
+  </div>
+</div>
+
+<div id="call" class="hidden">
+  <video id="remote" autoplay playsinline></video>
+  <video id="srcvid" autoplay playsinline muted style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none"></video>
+  <div id="novideo" class="hidden"><b id="nvname">Người ấy chưa có hình</b><span>Hai bạn nhắn tin cho nhau nhé</span></div>
+  <div id="hint" class="hidden">Chụm hai ngón hoặc chạm đúp để zoom</div>
+  <video id="screen" class="hidden" autoplay playsinline></video>
+  <video id="local" autoplay playsinline muted></video>
+  <div id="status"><b>Đang kết nối…</b></div>
+  <div id="hud" class="ui">
+    <div id="top"><span id="q" title="Chất lượng kết nối"></span><span id="peername" class="hidden"></span><button id="fxbtn" title="Hiệu ứng"><svg viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></button><button id="devbtn" title="Micro và loa"><svg viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg></button><button id="copy"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span id="copylbl">Sao chép link</span></button></div>
+    <div id="zoomctl" class="hidden"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="zslide" class="rng" type="range" min="1" max="5" step="0.05" value="1" aria-label="Zoom hình người ấy"><button id="zlbl" title="Về 1×">1×</button></div>
+    <div id="dev" class="hidden"><label>Micro<select id="micsel"></select></label><label id="spkrow">Loa / tai nghe<select id="spksel"></select></label></div>
+    <div id="fxp" class="hidden">
+      <label class="sw"><span>Làm đẹp da<small>Chỉ làm mịn vùng da, giữ nét mắt môi tóc</small></span><input id="beauty" type="checkbox"><i></i></label>
+      <label class="sw"><span>Làm đẹp khuôn mặt<small>Thon mặt, mắt to, môi và má hồng</small></span><input id="beauty2" type="checkbox"><i></i></label>
+      <div id="lkchips"></div>
+      <label class="sw" style="gap:10px"><span style="flex:none">Cường độ<small>Độ đậm của bộ lọc</small></span><input id="lkamt" type="range" min="10" max="100" step="5" style="position:static;opacity:1;pointer-events:auto"></label>
+      <div class="frow"><span>Nền</span></div>
+      <div id="bgchips"><button data-bg="off">Tắt</button><button data-bg="blur">Mờ</button><button data-bg="green">Lục bảo</button><button data-bg="dark">Điện ảnh</button></div>
+      <div id="gesthint"><b>Cử chỉ tay tự động</b><span>👍 👎 ✌️ 🤟 ✊ 👌 ❤️ 👋 👏 🙏</span></div>
+      <div id="fxstat"></div>
+    </div>
+  </div>
+  <div id="chat" class="hidden"><div id="chatup"><div id="msgs"></div>
+    <div id="tray" class="hidden"></div></div>
+    <div id="row"><button id="stk" title="Sticker"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></button><input id="msg" placeholder="Nhắn tin…" maxlength="500" autocomplete="off" enterkeyhint="send"><button id="send" title="Gửi"><svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button></div>
+  </div>
+  <input type="file" id="file" accept="image/*" class="hidden">
+  <div id="react" class="ui">
+    <button data-k="laugh" title="Cười">😂</button><button data-k="heart" title="Thả tim">❤️</button><button data-k="like" title="Thích">👍</button><button data-k="angry" title="Giận">😡</button><button data-k="kiss" title="Hôn">😘</button><button data-k="cheek" title="Thơm má">😚</button><button data-k="cry" title="Khóc">😭</button>
+  </div>
+  <div id="bar" class="ui">
+    <button id="mic" title="Tắt/bật mic"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path class="sl" d="M3 3l18 18"/></svg></button>
+    <button id="cam" title="Tắt/bật camera"><svg viewBox="0 0 24 24"><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"/><rect x="2" y="6" width="14" height="12" rx="2"/><path class="sl" d="M3 3l18 18"/></svg></button>
+    <button id="flip" title="Đổi camera trước/sau"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M8 16H3v5"/></svg></button>
+    <button id="share" title="Chia sẻ màn hình"><svg viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
+    <button id="reactbtn" title="Cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></button>
+    <button id="chatbtn" title="Nhắn tin"><svg viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></button>
+    <button id="end" title="Kết thúc"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg></button>
+  </div>
+  <div id="fx" aria-hidden="true"></div>
+</div>
+
+<script id="fxw" type="javascript/worker">
+let MPV, fs, seg, ges, inv, lastTs = 0, cpu = false, face, fIni = false, faceUrl = "";
+const tsn = () => (lastTs = Math.max(performance.now(), lastTs + 1));
+async function getBuf(url) {
+  try {
+    const c = await caches.open("vcall-models-v1"), hit = await c.match(url);
+    if (hit) return new Uint8Array(await hit.arrayBuffer());
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("http " + r.status);
+    c.put(url, r.clone()).catch(() => {});
+    return new Uint8Array(await r.arrayBuffer());
+  } catch (e) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("http " + r.status);
+    return new Uint8Array(await r.arrayBuffer());
+  }
+}
+async function mk(cls, url, opts) {
+  const modelAssetBuffer = await getBuf(url);
+  const delegate = cpu ? "CPU" : "GPU";
+  const canvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(1, 1) : undefined; // tự truyền canvas: Chrome/iOS bị thư viện nhận nhầm là không hỗ trợ
+  const m = await MPV[cls].createFromOptions(fs, { baseOptions: { modelAssetBuffer, delegate }, canvas, runningMode: "VIDEO", ...opts });
+  return [m, delegate];
+}
+async function initFace() {
+  if (face || fIni || !faceUrl || !fs) return; fIni = true;
+  try { const r = await mk("FaceLandmarker", faceUrl, { numFaces: 1 }); face = r[0]; postMessage({ t: "ready", k: "face", d: r[1] }); }
+  catch (e) { postMessage({ t: "err", k: "face", gpu: !cpu, m: String(e && e.message || e) }); }
+  fIni = false;
+}
+onmessage = async ({ data: d }) => {
+  if (d.t === "face") { faceUrl = d.url; initFace(); return; }
+  if (d.t === "init") {
+    cpu = !!d.cpu;
+    try {
+      const code = await (await fetch(d.mp + "/vision_bundle.cjs")).text();
+      MPV = {}; new Function("exports", code)(MPV);
+      fs = await MPV.FilesetResolver.forVisionTasks(d.mp + "/wasm");
+    } catch (e) { postMessage({ t: "err", k: "boot", gpu: !cpu, m: String(e && e.message || e) }); return; }
+    try {
+      const r = await mk("GestureRecognizer", d.ges, { numHands: 2 });
+      ges = r[0]; postMessage({ t: "ready", k: "ges", d: r[1] });
+    } catch (e) { postMessage({ t: "err", k: "ges", gpu: !cpu, m: String(e && e.message || e) }); }
+    try {
+      const r = await mk("ImageSegmenter", d.seg, { outputConfidenceMasks: true, outputCategoryMask: false });
+      seg = r[0]; postMessage({ t: "ready", k: "seg", d: r[1] });
+    } catch (e) { postMessage({ t: "err", k: "seg", gpu: !cpu, m: String(e && e.message || e) }); }
+    initFace();
+    return;
+  }
+  if (d.t !== "frame") return;
+  const out = { t: "res", asp: d.asp }, tr = [];
+  if (d.seg && seg) {
+    try {
+      seg.segmentForVideo(d.bmp, tsn(), r => {
+        const ms = r.confidenceMasks; if (!ms || !ms.length) return;
+        const m = ms[ms.length > 1 ? 1 : 0], f = m.getAsFloat32Array(), w = m.width, h = m.height, n = w * h;
+        if (inv === undefined) { // tự nhận biết mask là "người" hay "nền": người thường ở giữa khung
+          const c = f[(h >> 1) * w + (w >> 1)], e = (f[w * 2 + 2] + f[w * 3 - 3]) / 2;
+          if (Math.abs(c - e) > .3) inv = c < e;
+        }
+        const u = new Uint8Array(n), iv = !!inv;
+        for (let i = 0; i < n; i++) u[i] = (iv ? 1 - f[i] : f[i]) * 255;
+        out.mask = u.buffer; out.mw = w; out.mh = h; tr.push(u.buffer);
+      });
+    } catch (e) {}
+  }
+  if (d.hand && ges) {
+    try {
+      const r = ges.recognizeForVideo(d.bmp, tsn());
+      out.hands = r.landmarks.map(h => h.map(p => [p.x, p.y]));
+      out.cats = r.gestures.map(g => g[0] ? [g[0].categoryName, g[0].score] : ["", 0]);
+    } catch (e) {}
+  }
+  if (d.face && face) { // chỉ gửi 16 số (mắt, cằm, má, mũi, môi) thay vì 478 điểm
+    try {
+      const l = face.detectForVideo(d.bmp, tsn()).faceLandmarks[0];
+      if (l) { const a = l[468], b = l[473], ch = l[152], cl = l[234], cr = l[454], n = l[1], lt = l[0], lb = l[17], ml = l[61], mr = l[291];
+        out.face = [a.x, a.y, b.x, b.y, ch.x, ch.y, cl.x, cl.y, cr.x, cr.y, n.x, n.y, (ml.x + mr.x) / 2, (lt.y + lb.y) / 2, Math.abs(mr.x - ml.x) / 2, Math.abs(lb.y - lt.y) / 2]; }
+      else out.face = 0;
+    } catch (e) {}
+  }
+  try { d.bmp.close(); } catch (e) {}
+  postMessage(out, tr);
+};
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const PREFIX = "vcall-love-v1-";
+/* ====== CÀI ĐẶT TURN (bắt buộc để gọi khác mạng: wifi ↔ 4G/5G) ======
+   Đăng ký miễn phí tại https://dashboard.metered.ca/signup, tạo app, vào mục TURN Server
+   → copy "API Key" và tên app, rồi dán link dưới đây (thay TENAPP và API_KEY):
+   https://TENAPP.metered.live/api/v1/turn/credentials?apiKey=API_KEY */
+const TURN_URL = "https://roniejisa.metered.live/api/v1/turn/credentials?apiKey=42effbf49768f78f32276d1d313d2ed59748";
+
+// TURN dự phòng (dán thẳng từ trang Credentials của Metered): luôn có sẵn, kể cả khi link TURN_URL ở trên lỗi
+const U = "827059ab537aa3192f6608b4", C = "1CLsUTfPAf6W3j2r";
+const BASE_ICE = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun.relay.metered.ca:80" },
+  { urls: "turn:standard.relay.metered.ca:80", username: U, credential: C },
+  { urls: "turn:standard.relay.metered.ca:80?transport=tcp", username: U, credential: C },
+  { urls: "turn:standard.relay.metered.ca:443", username: U, credential: C },
+  { urls: "turns:standard.relay.metered.ca:443?transport=tcp", username: U, credential: C }
+];
+const ICE = { iceServers: [...BASE_ICE], iceCandidatePoolSize: 4 };
+// Nếu lấy được danh sách mới từ TURN_URL thì dùng danh sách đó (luôn là bản mới nhất)
+const iceReady = (async () => {
+  if (!TURN_URL) return;
+  try {
+    const list = await (await fetch(TURN_URL)).json();
+    if (Array.isArray(list) && list.length) ICE.iceServers = [{ urls: "stun:stun.l.google.com:19302" }, ...list];
+  } catch {}
+})();
+
+// Quay Full HD (không đòi 4K vì nhiều camera cắt khung ở chế độ 4K, nhìn bị zoom), rồi tự hạ/nâng khi mạng đổi
+const LEVELS = [
+  { scale: 1,   bitrate: 8000000 },
+  { scale: 1.5, bitrate: 4000000 },
+  { scale: 2,   bitrate: 2000000 },
+  { scale: 3,   bitrate: 1000000 }
+];
+let lvl = 0, badN = 0, goodN = 0;
+let peer, localStream, mediaReady, currentCall, chatConn, facing = "user", room = "";
+let wake, hideTimer, statsTimer, retryTimer, ending = false, connected = false, retryPending = false;
+let remoteHasVideo = false, chatOpen = false, wd, gotStream = false, peerHasMedia = false;
+let shareStream = null, shareCall = null, screenCall = null, screenIn = false;
+const EMOJIS = "❤️ 😘 🥰 😍 🤗 😂 🤣 😭 🥺 😴 😎 🙈 😡 🌹 💋 🎁 💑 🍜 ☕ 🌙 ⭐ 🎉 👍 💪 😋 🤔 🙏 🔥".split(" ");
+let myName = "", peerName = "", customStickers = [];
+try {
+  $("name").value = localStorage.getItem("vcall-name") || "";
+  customStickers = JSON.parse(localStorage.getItem("vcall-stickers") || "[]");
+} catch {}
+if (!Array.isArray(customStickers)) customStickers = [];
+$("name").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+
+const clean = s => s.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+const setStatus = (t, s) => { const el = $("status"); el.classList.remove("gone"); el.innerHTML = `<b>${t}</b>${s ? `<span>${s}</span>` : ""}`; };
+
+function sdpTransform(sdp) {
+  return sdp.replace(/a=fmtp:(\d+) (.*minptime=10.*)/g, (m, pt, rest) =>
+    `a=fmtp:${pt} ${rest};useinbandfec=1;usedtx=1;maxaveragebitrate=64000;stereo=0`);
+}
+const callOpts = { sdpTransform, constraints: { offerToReceiveAudio: true, offerToReceiveVideo: true } };
+
+const urlRoom = new URLSearchParams(location.search).get("room");
+if (urlRoom) $("code").value = clean(urlRoom);
+$("rand").onclick = () => { $("code").value = Math.random().toString(36).slice(2, 8); };
+$("join").onclick = start;
+$("code").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+
+// Thử camera+mic → chỉ mic → chỉ camera → không có gì (vẫn nhắn tin được)
+let actx, gateTimer, rawMic, rawCam, micId = "", spkId = "";
+const GATE = 0.01; // ngưỡng nhiễu: tăng (0.02) nếu còn ồn, giảm (0.006) nếu giọng bị cắt
+const AUDIO_C = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
+function cleanAudio(track) {
+  clearInterval(gateTimer); actx?.close().catch(() => {});
+  const ctx = actx = new (window.AudioContext || window.webkitAudioContext)();
+  ctx.resume?.();
+  const src = ctx.createMediaStreamSource(new MediaStream([track]));
+  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 100;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 7500;
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -30; comp.ratio.value = 3;
+  const gate = ctx.createGain(), an = ctx.createAnalyser(); an.fftSize = 512;
+  const dest = ctx.createMediaStreamDestination();
+  src.connect(hp); hp.connect(lp); lp.connect(an); lp.connect(comp); comp.connect(gate); gate.connect(dest);
+  const buf = new Float32Array(an.fftSize); let holdUntil = 0;
+  gateTimer = setInterval(() => {
+    an.getFloatTimeDomainData(buf);
+    let sum = 0; for (const v of buf) sum += v * v;
+    const now = performance.now();
+    if (Math.sqrt(sum / buf.length) > GATE) holdUntil = now + 400;
+    const open = now < holdUntil;
+    gate.gain.setTargetAtTime(open ? 1 : 0.05, ctx.currentTime, open ? 0.02 : 0.15);
+  }, 50);
+  return dest.stream.getAudioTracks()[0];
+}
+async function getMedia(strict) {
+  localStream?.getTracks().forEach(t => t.stop());
+  rawMic?.stop(); rawMic = null; stopPipe(); rawCam?.stop(); rawCam = null;
+  const v = { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } };
+  const a = { ...AUDIO_C }; if (micId) a.deviceId = { ideal: micId };
+  const tries = strict ? [{ video: v, audio: a }] : [{ video: v, audio: a }, { video: false, audio: a }, { video: v, audio: false }];
+  let s = null;
+  for (const c of tries) {
+    try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (e) { if (strict) throw e; }
+  }
+  localStream = s || new MediaStream();
+  rawMic = localStream.getAudioTracks()[0] || null;
+  rawCam = localStream.getVideoTracks()[0] || null;
+  if (rawMic) { try { localStream = new MediaStream([...localStream.getVideoTracks(), cleanAudio(rawMic)]); } catch {} }
+  const vt = localStream.getVideoTracks()[0], at = localStream.getAudioTracks()[0];
+  if (vt && "contentHint" in vt) vt.contentHint = "motion";
+  $("local").srcObject = localStream;
+  $("local").classList.toggle("hidden", !vt);
+  $("local").classList.toggle("back", facing === "environment");
+  $("cam").disabled = !vt; $("flip").disabled = !vt; $("mic").disabled = !at;
+  listDevices(); applyFx();
+}
+/* ---------- Chọn micro / loa (tự chuyển khi cắm hoặc rút tai nghe) ---------- */
+async function listDevices() {
+  let d = []; try { d = await navigator.mediaDevices.enumerateDevices(); } catch {}
+  const fill = (el, kind, cur, name) => {
+    el.innerHTML = "";
+    const auto = document.createElement("option"); auto.value = ""; auto.textContent = "Tự động (theo hệ thống)"; el.appendChild(auto);
+    d.filter(x => x.kind === kind && x.deviceId && x.deviceId !== "default" && x.deviceId !== "communications").forEach((x, i) => {
+      const o = document.createElement("option"); o.value = x.deviceId; o.textContent = x.label || name + " " + (i + 1); el.appendChild(o);
+    });
+    el.value = [...el.options].some(o => o.value === cur) ? cur : "";
+  };
+  fill($("micsel"), "audioinput", micId, "Micro"); fill($("spksel"), "audiooutput", spkId, "Loa");
+  return d;
+}
+async function setMic(id) {
+  micId = id || "";
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: micId ? { ...AUDIO_C, deviceId: { exact: micId } } : AUDIO_C });
+    const raw = s.getAudioTracks()[0], t = cleanAudio(raw);
+    t.enabled = !$("mic").classList.contains("off");
+    rawMic?.stop(); rawMic = raw;
+    const old = localStream.getAudioTracks()[0]; if (old) { localStream.removeTrack(old); old.stop(); }
+    localStream.addTrack(t); $("mic").disabled = false;
+    const sd = currentCall?.peerConnection?.getSenders().find(x => x.track && x.track.kind === "audio");
+    if (sd) await sd.replaceTrack(t);
+  } catch { cap("Không mở được micro này"); }
+}
+async function setSpk(id) {
+  spkId = id || "";
+  try { await $("remote").setSinkId(spkId); } catch { cap("Không chuyển được loa"); }
+}
+$("micsel").onchange = e => setMic(e.target.value);
+$("spksel").onchange = e => setSpk(e.target.value);
+$("devbtn").onclick = () => { $("fxp").classList.add("hidden"); $("dev").classList.toggle("hidden"); pokeUI(); };
+if (!("setSinkId" in HTMLMediaElement.prototype)) $("spkrow").classList.add("hidden"); // iOS/Safari: chọn loa ở hệ thống
+let devTimer;
+navigator.mediaDevices?.addEventListener?.("devicechange", () => {
+  clearTimeout(devTimer);
+  devTimer = setTimeout(async () => {
+    const d = await listDevices();
+    if (!localStream || $("call").classList.contains("hidden")) return;
+    const has = (kind, id) => d.some(x => x.kind === kind && x.deviceId === id);
+    if (spkId && !has("audiooutput", spkId)) setSpk("");
+    if (micId && !has("audioinput", micId)) setMic("");
+    else if (!micId && rawMic) setMic("");   // đang để tự động: bám theo thiết bị mặc định mới
+  }, 700);
+});
+
+/* ---------- Hiệu ứng: làm mịn da, xóa phông, cử chỉ tự động ----------
+   Nhận diện + tách nền chạy trong Web Worker (không làm đơ hình), mô hình tải sẵn và lưu cache. */
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+const SEG_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
+const FACE_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const GES_URL = "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
+const LOOKS = [ // [tên, gain RGB, sat | lift RGB, contrast | bloom, vignette, grain, exposure | tint tối RGB | tint sáng RGB]
+  ["off", "Gốc"],
+  ["fresh", "🌿 Tươi sáng", 1.04, 1.03, 1.02, 1.12, .02, .02, .02, 1.05, .12, 0, 0, .2, 0, 0, 0, 0, 0, 0],
+  ["korea", "🌸 Hàn Quốc", 1.03, 1, 1.04, .92, .07, .05, .07, .95, .25, 0, 0, .3, 0, 0, 0, .02, 0, .01],
+  ["cine", "🎬 Điện ảnh", 1.05, 1, .95, 1.1, 0, 0, 0, 1.18, 0, .35, .03, 0, -.02, .02, .05, .05, .02, -.03],
+  ["film", "📷 Phim cũ", 1.06, 1, .9, .85, .05, .04, .02, 1.08, 0, .3, .07, 0, 0, .01, .02, 0, 0, 0],
+  ["gold", "🌅 Hoàng hôn", 1.12, 1, .82, 1.15, 0, 0, 0, 1.08, .2, .2, 0, .1, 0, 0, 0, 0, 0, 0],
+  ["dream", "☁️ Mơ màng", 1.02, 1, 1.06, 1, .04, .03, .06, .92, .55, 0, 0, .15, 0, 0, 0, 0, 0, 0],
+  ["rosy", "🍑 Anh đào", 1.08, .97, 1, 1.1, .04, .01, .02, 1, .2, 0, 0, 0, 0, 0, 0, .03, 0, .01],
+  ["cool", "❄️ Bắc Âu", .94, 1, 1.1, .9, 0, .02, .04, 1.1, .1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ["cyber", "🌃 Neon", 1, .95, 1.1, 1.35, 0, 0, 0, 1.15, .35, .3, 0, 0, .05, -.02, .08, -.02, .05, .06],
+  ["noir", "🖤 Đen trắng", 1, 1, 1, 0, 0, 0, 0, 1.25, 0, .4, .05, 0, 0, 0, 0, 0, 0, 0],
+];
+const FX = { smooth: 0, bg: "off", gest: true, face: false, look: "off", la: 80 };   // cử chỉ luôn tự động; làm mịn da chỉ bật/tắt (độ mịn cố định)
+const BEAUTY = 75;
+try {
+  const s = JSON.parse(localStorage.getItem("vcall-fx") || "{}") || {};
+  FX.smooth = +s.smooth > 0 ? BEAUTY : 0; FX.bg = s.bg; FX.face = !!s.face; if (LOOKS.some(l => l[0] === s.look)) FX.look = s.look; if (+s.la >= 10 && +s.la <= 100) FX.la = +s.la;
+} catch {} if (!["off", "blur", "green", "dark"].includes(FX.bg)) FX.bg = "off";
+let pipe = null, fxSeq = 0, fwCpu = false, fw = null, fwBusy = 0, fwSt = { ges: false, seg: false, dead: false }, anaOn = false, anaId = 0, lastSend = 0, lastHand = 0, faceAsked = false, lastFaceT = 0;
+const mkCv = () => document.createElement("canvas");
+const needPix = () => FX.smooth > 0 || FX.bg !== "off" || FX.face || FX.look !== "off";
+const fxSay = t => { $("fxstat").textContent = t; };
+const saveFx = () => { try { localStorage.setItem("vcall-fx", JSON.stringify({ smooth: FX.smooth, bg: FX.bg, face: FX.face, look: FX.look, la: FX.la })); } catch {} };
+function syncFxUI() {
+  $("beauty").checked = FX.smooth > 0; $("beauty2").checked = FX.face; $("lkamt").value = FX.la;
+  document.querySelectorAll("#lkchips button").forEach(b => b.classList.toggle("on", b.dataset.lk === FX.look));
+  document.querySelectorAll("#bgchips button").forEach(b => b.classList.toggle("on", b.dataset.bg === FX.bg));
+  $("fxbtn").classList.toggle("act", needPix());
+}
+// Tải sẵn mô hình lúc trang vừa mở (rảnh mới tải) để vào cuộc gọi là dùng được ngay
+(() => {
+  if (navigator.connection?.saveData) return;
+  const go = async () => {
+    try { const c = await caches.open("vcall-models-v1"); for (const u of [GES_URL, SEG_URL]) if (!(await c.match(u))) await c.add(u); } catch {}
+    for (const u of [MP + "/vision_bundle.cjs", MP + "/wasm/vision_wasm_internal.js", MP + "/wasm/vision_wasm_internal.wasm"]) fetch(u).catch(() => {});
+  };
+  (window.requestIdleCallback || (f => setTimeout(f, 1500)))(go, { timeout: 4000 });
+})();
+
+/* --- Worker: khởi tạo một lần, mô hình tự nạp nền --- */
+function fxInit() {
+  if (fw || fwSt.dead) return;
+  try { fw = new Worker(URL.createObjectURL(new Blob([$("fxw").textContent], { type: "text/javascript" }))); }
+  catch { fwSt.dead = true; fxSay("Trình duyệt không hỗ trợ cử chỉ tự động."); return; }
+  fw.onmessage = onFw;
+  fw.onerror = () => { fwSt.dead = true; fxSay("Không chạy được nhận diện cử chỉ."); };
+  fw.postMessage({ t: "init", mp: MP, ges: GES_URL, seg: SEG_URL, cpu: fwCpu });
+  fxSay("Đang chuẩn bị cử chỉ…");
+}
+function onFw({ data: d }) {
+  if (d.t === "ready") {
+    fwSt[d.k] = true;
+    if (d.k === "ges") fxSay("Cử chỉ tự động đã sẵn sàng.");
+    if (d.k === "seg" && FX.bg !== "off") fxSay("Đã bật.");
+    if (d.k === "face") fxSay("Đã bật làm đẹp khuôn mặt.");
+  } else if (d.t === "err") {
+    if (d.gpu && !fwCpu) { // GPU trong worker không chạy được → dựng lại worker ở chế độ CPU (vẫn không chặn hình)
+      fwCpu = true; try { fw.terminate(); } catch {} fw = null; fwBusy = 0; fwSt = { ges: false, seg: false, face: false, dead: false }; faceAsked = false; fxInit(); if (FX.face) askFace(); return;
+    }
+    if (d.k === "face") { FX.face = false; saveFx(); applyFx(); fxSay("Không bật được làm đẹp khuôn mặt: " + String(d.m).slice(0, 70)); return; }
+    if (d.k === "seg") { if (FX.bg !== "off") { FX.bg = "off"; saveFx(); applyFx(); } fxSay("Không bật được tách nền: " + String(d.m).slice(0, 70)); }
+    else { fwSt.dead = true; fxSay("Cử chỉ chưa chạy được: " + String(d.m).slice(0, 70)); }
+  } else if (d.t === "res") {
+    fwBusy = 0;
+    if (d.mask && pipe) setMask(pipe, d);
+    if (d.hands) onHands(d);
+    if (d.face !== undefined && pipe) setFace(pipe, d.face);
+  }
+}
+function askFace() { if (!fw || faceAsked || fwSt.face) return; faceAsked = true; fw.postMessage({ t: "face", url: FACE_URL }); fxSay("Đang tải mô hình khuôn mặt…"); }
+function setFace(P, f) { // có hysteresis: mất mặt >4 lần liên tiếp mới tắt hiệu ứng, tránh chớp
+  if (!f) { if (++P.miss > 4) P.fT = 0; return; }
+  P.miss = 0; P.LT.set(f); if (!P.fT) P.LC.set(f); P.fT = 1;
+}
+function anaLoop(id) {
+  const v = $("srcvid"), f = () => { if (id !== anaId || !anaOn) return; anaLoop(id); anaStep(); };
+  if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(f); else setTimeout(f, 50);
+}
+const anaCv = mkCv(), anaCx = anaCv.getContext("2d", { alpha: false });
+async function anaStep() {
+  const t = performance.now(), v = $("srcvid");
+  if (fwBusy && t - fwBusy > 4000) fwBusy = 0;           // worker kẹt thì gỡ khóa
+  if (fwBusy || !fw || document.hidden || v.readyState < 2 || !v.videoWidth) return;
+  const seg = FX.bg !== "off" && fwSt.seg && !!pipe, hand = FX.gest && fwSt.ges && t - lastHand >= 90, face = FX.face && fwSt.face && !!pipe && t - lastFaceT >= 45;
+  if (!seg && !hand && !face) return;
+  if (!hand && !face && t - lastSend < 30) return;
+  fwBusy = lastSend = t; if (hand) lastHand = t; if (face) lastFaceT = t;
+  const w = 384, h = Math.max(1, Math.round(w * v.videoHeight / v.videoWidth));
+  if (anaCv.width !== w || anaCv.height !== h) { anaCv.width = w; anaCv.height = h; }
+  anaCx.drawImage(v, 0, 0, w, h);
+  try { const bmp = await createImageBitmap(anaCv); fw.postMessage({ t: "frame", bmp, seg, hand, face, asp: w / h }, [bmp]); }
+  catch { fwBusy = 0; }
+}
+function anaSync() {
+  const want = (FX.gest || FX.bg !== "off" || FX.face) && !!rawCam;
+  if (want && !anaOn) { anaOn = true; anaLoop(++anaId); }
+  else if (!want && anaOn) { anaOn = false; anaId++; }
+}
+
+function setSrc() {
+  const v = $("srcvid");
+  if (!rawCam) return;
+  if (v.srcObject?.getVideoTracks()[0] !== rawCam) v.srcObject = new MediaStream([rawCam]);
+  v.play().catch(() => {});
+}
+// Đổi track thì dựng lại thẻ <video> xem trước: tránh lỗi WebKit giữ kích thước hình cũ làm khung camera bị co lọt thỏm
+function freshLocal(stream) {
+  const o = $("local"), n = o.cloneNode(false);
+  n.srcObject = stream; n.muted = true; n.playsInline = true; n.autoplay = true;
+  o.replaceWith(n); bindLocal(n); n.play().catch(() => {});
+}
+function setVideoTrack(t) {
+  const old = localStream.getVideoTracks()[0];
+  if (old === t) return;
+  if (old) localStream.removeTrack(old);
+  t.enabled = !$("cam").classList.contains("off");
+  if ("contentHint" in t) t.contentHint = "motion";
+  localStream.addTrack(t); freshLocal(new MediaStream([t]));
+  const sd = currentCall?.peerConnection?.getSenders().find(x => x.track && x.track.kind === "video");
+  if (sd) sd.replaceTrack(t).catch(() => {});
+}
+
+/* --- Đường ống hình WebGL2: làm mịn da + thay nền, mask nội suy theo thời gian trên GPU --- */
+const VS = `#version 300 es
+in vec2 p; out vec2 vUv;
+void main(){ vUv = vec2(p.x * .5 + .5, .5 - p.y * .5); gl_Position = vec4(p, 0., 1.); }`;
+const FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D F, M0, M1;
+uniform float sm, hasM, mt, ba, fa, la, gt; uniform vec4 K[5]; uniform int bg; uniform vec2 px; uniform vec2 L[8]; // L: mắt, mắt, cằm, má, má, mũi, tâm môi, nửa kích thước môi
+vec3 grad(vec2 u, int k) {
+  float r = length((u - vec2(.5, .42)) * vec2(1., .9));
+  vec3 a = k == 2 ? vec3(.12, .48, .34) : vec3(.2, .255, .29);
+  vec3 b = k == 2 ? vec3(.05, .23, .16) : vec3(.078, .11, .133);
+  vec3 c = k == 2 ? vec3(.016, .063, .043) : vec3(.02, .027, .04);
+  return r < .4 ? mix(a, b, r / .4) : mix(b, c, clamp((r - .4) / .4, 0., 1.));
+}
+void main() {
+  vec2 uv = vUv; float ar = px.y / px.x;
+  if (fa > .001) { // biến dạng nhẹ: mắt to, thon hàm (lấy mẫu từ vị trí đã dịch)
+    float er = length((L[1] - L[0]) * vec2(ar, 1.)) * .26;
+    for (int i = 0; i < 2; i++) {
+      vec2 e = L[i]; float r = length((uv - e) * vec2(ar, 1.)) / er;
+      if (r < 1.) uv = e + (uv - e) * (1. - .24 * fa * (1. - r * r));
+    }
+    vec2 cc = (L[3] + L[4]) * .5; float hw = max(abs(L[4].x - L[3].x) * .5, .01), ey = (L[0].y + L[1].y) * .5;
+    float t = (uv.y - ey) / max(L[2].y - ey, .01), dx = uv.x - cc.x;
+    uv.x = cc.x + dx * (1. + .11 * fa * smoothstep(.45, .9, t) * (1. - smoothstep(1., 1.12, t)) * (1. - smoothstep(1., 1.7, abs(dx) / hw)));
+  }
+  vec3 c = texture(F, uv).rgb;
+  if (sm > 0.) { // làm đẹp: chỉ làm mịn vùng DA (nhận bằng màu), giữ nét mắt/môi/tóc/viền
+    vec3 m = textureLod(F, uv, 3.).rgb;                       // màu đã làm mờ để mặt nạ da ổn định, không lốm đốm
+    float Y = dot(m, vec3(.299, .587, .114));
+    float cb = .5 - .169 * m.r - .331 * m.g + .5 * m.b, cr = .5 + .5 * m.r - .419 * m.g - .081 * m.b;
+    float sk = smoothstep(.27, .32, cb) * (1. - smoothstep(.49, .54, cb)) * smoothstep(.49, .53, cr) * (1. - smoothstep(.66, .70, cr)) * smoothstep(.15, .3, Y);
+    if (sk > .01) {
+      float R = 9. / (px.y * 720.);                          // bán kính theo độ phân giải
+      vec3 acc = c; float ws = 1.;
+      for (int i = 0; i < 20; i++) {                         // bilateral: pha màu gần giống nhau, bỏ qua chỗ khác biệt lớn (viền)
+        float an = float(i) * 2.39996, rr = sqrt((float(i) + .5) / 20.) * R;
+        vec3 s = textureLod(F, uv + vec2(cos(an), sin(an)) * rr * px, 0.).rgb, d = s - c;
+        float w = exp(-dot(d, d) * 45.); acc += s * w; ws += w;
+      }
+      c = mix(c, acc / ws, sk * sm);
+      c = pow(c, vec3(1. - .16 * sk * sm, 1. - .13 * sk * sm, 1. - .09 * sk * sm)); // da sáng, hơi hồng ấm
+    }
+  }
+  if (fa > .001) { // môi hồng, má hồng
+    vec2 d = (uv - L[6]) / (L[7] * vec2(1.1, 1.2) + .001);
+    float lm = (1. - smoothstep(.55, 1., length(d))) * (.4 + .6 * smoothstep(.2, .32, c.r - c.g));
+    c = mix(c, c * vec3(1.12, .82, .9) + vec3(.04, 0., .01), lm * .55 * fa);
+    float rad = max(abs(L[4].x - L[3].x) * ar * .25, .01);
+    for (int i = 3; i < 5; i++) {
+      vec2 bc = mix(L[i], L[5], .5) + vec2(0., rad * .4);
+      float bl = exp(-1.5 * pow(length((uv - bc) * vec2(ar, 1.)) / rad, 2.));
+      c = mix(c, c * vec3(1.05, .92, .95) + vec3(.035, 0., .01), bl * .4 * fa);
+    }
+    c = clamp(c, 0., 1.);
+  }
+  if (bg > 0 && hasM > .5) {
+    float m = smoothstep(.4, .7, mix(texture(M0, uv).r, texture(M1, uv).r, mt));
+    vec3 back;
+    if (bg == 1) {
+      vec2 e = px * 14.;
+      back = (textureLod(F, uv, 4.).rgb * .36
+        + (textureLod(F, uv + vec2(e.x, 0.), 4.).rgb + textureLod(F, uv - vec2(e.x, 0.), 4.).rgb
+        + textureLod(F, uv + vec2(0., e.y), 4.).rgb + textureLod(F, uv - vec2(0., e.y), 4.).rgb) * .16) * .82;
+    } else back = grad(uv, bg);
+    c = mix(c, mix(back, c, m), ba);
+  }
+  if (la > 0.) { // bộ lọc màu: cân trắng, nâng đen, bão hòa, tương phản, tách tông, glow, vignette, hạt phim
+    vec3 g0 = c;
+    c *= exp2(K[2].w) * K[0].rgb;
+    c += K[1].rgb * (1. - c);
+    float Y = dot(c, vec3(.299, .587, .114));
+    c = mix(vec3(Y), c, K[0].a);
+    c = (c - .5) * K[1].a + .5;
+    c += K[3].rgb * (1. - smoothstep(0., .6, Y)) + K[4].rgb * smoothstep(.4, 1., Y);
+    if (K[2].x > 0.) c = 1. - (1. - c) * (1. - textureLod(F, uv, 3.).rgb * K[2].x);
+    c *= 1. - K[2].y * smoothstep(.3, .95, length((vUv - .5) * vec2(ar, 1.)));
+    c += (fract(sin(dot(vUv * 937. + gt, vec2(12.9898, 78.233))) * 43758.5453) - .5) * K[2].z;
+    c = mix(g0, clamp(c, 0., 1.), la);
+  }
+  o = vec4(c, 1.);
+}`;
+function startPipe() {
+  if (pipe) return pipe.track;
+  setSrc();
+  const cv = mkCv(), gl = cv.getContext("webgl2", { alpha: false, antialias: false, desynchronized: true, powerPreference: "high-performance" });
+  if (!gl) throw new Error("no webgl2");
+  const sh = (t, src) => { const x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error("link");
+  gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const tex = (unit, min) => {
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t;
+  };
+  const ft = tex(0, gl.LINEAR), m0 = tex(1, gl.LINEAR), m1 = tex(2, gl.LINEAR);
+  gl.uniform1i(gl.getUniformLocation(pr, "F"), 0); gl.uniform1i(gl.getUniformLocation(pr, "M0"), 1); gl.uniform1i(gl.getUniformLocation(pr, "M1"), 2);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  const U = n => gl.getUniformLocation(pr, n);
+  const v = $("srcvid"), kk = Math.min(1, 1280 / Math.max(v.videoWidth || 1280, v.videoHeight || 720));
+  cv.width = Math.max(2, Math.round((v.videoWidth || 1280) * kk)); cv.height = Math.max(2, Math.round((v.videoHeight || 720) * kk)); gl.viewport(0, 0, cv.width, cv.height); // cỡ hình cố định, không đổi giữa chừng
+  const P = pipe = { on: true, cv, gl, ft, m0, m1, mw: 0, mh: 0, haveMask: false, mAt: 0, mDt: 90, ba: 0, mip: false, LT: new Float32Array(16), LC: new Float32Array(16), fT: 0, fA: 0, miss: 0, lk: null, K: new Float32Array(20), max: 1280, good: 0, cnt: 0, t0: 0,
+    u: { la: U("la"), K: U("K"), gt: U("gt"), fa: U("fa"), L: U("L"), sm: U("sm"), hasM: U("hasM"), mt: U("mt"), ba: U("ba"), bg: U("bg"), px: U("px") } };
+  P.track = cv.captureStream().getVideoTracks()[0];
+  if ("contentHint" in P.track) P.track.contentHint = "motion";
+  const tick = () => { if (!P.on) return; try { frame(P, v); } catch {} next(); };
+  const next = () => v.requestVideoFrameCallback ? v.requestVideoFrameCallback(tick) : requestAnimationFrame(tick);
+  try { frame(P, v); } catch {}   // vẽ sẵn 1 khung để lúc đổi track không bị chớp đen
+  next();
+  return P.track;
+}
+function stopPipe() {
+  if (!pipe) return;
+  pipe.on = false; try { pipe.track.stop(); pipe.gl.getExtension("WEBGL_lose_context")?.loseContext(); } catch {}
+  pipe = null;
+}
+function frame(P, v) {
+  if (v.readyState < 2 || !v.videoWidth) return;
+  const gl = P.gl, vw = v.videoWidth, vh = v.videoHeight;
+  const bgOn = FX.bg !== "off" && P.haveMask, LK = LOOKS.find(l => l[0] === FX.look), mip = FX.smooth > 0 || FX.bg === "blur" || (LK && LK[10] > 0), now = performance.now();
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, P.ft);
+  if (P.mip !== mip) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR); P.mip = mip; }
+  if (P.vw !== vw || P.vh !== vh) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v); P.vw = vw; P.vh = vh; }
+  else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, v);
+  if (mip) gl.generateMipmap(gl.TEXTURE_2D);   // chỉ tạo mipmap khi thật sự cần (làm mịn / mờ nền)
+  if (FX.bg === "off") P.ba = 0; else { P.ba += ((bgOn ? 1 : 0) - P.ba) * .12; if (Math.abs((bgOn ? 1 : 0) - P.ba) < .003) P.ba = bgOn ? 1 : 0; }
+  gl.uniform1f(P.u.sm, FX.smooth / 100);
+  gl.uniform1i(P.u.bg, { off: 0, blur: 1, green: 2, dark: 3 }[FX.bg]);
+  gl.uniform1f(P.u.hasM, bgOn ? 1 : 0);
+  gl.uniform1f(P.u.mt, Math.min(1, (now - P.mAt) / (P.mDt * .7)));
+  gl.uniform1f(P.u.ba, P.ba);
+  P.fA += ((FX.face && P.fT ? 1 : 0) - P.fA) * .15; if (P.fA < .004) P.fA = 0;   // mờ dần khi mất mặt
+  if (P.fA > 0) { for (let i = 0; i < 16; i++) P.LC[i] += (P.LT[i] - P.LC[i]) * .4; gl.uniform2fv(P.u.L, P.LC); }   // làm mượt tọa độ giữa các lần nhận diện
+  gl.uniform1f(P.u.fa, P.fA);
+  if (LK && LK.length > 2) { if (P.lk !== LK) { P.lk = LK; const a = LK.slice(2); P.K.set([...a.slice(0, 12), a[12], a[13], a[14], 0, a[15], a[16], a[17], 0]); gl.uniform4fv(P.u.K, P.K); } gl.uniform1f(P.u.la, FX.la / 100); } else gl.uniform1f(P.u.la, 0);
+  gl.uniform1f(P.u.gt, (now % 1000) / 7.3);
+  gl.uniform2f(P.u.px, 1 / vw, 1 / vh);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+// Mask mới từ worker: giữ mask cũ + mới trên GPU, shader nội suy giữa hai mask nên viền chuyển động mượt dù mask chỉ cập nhật ~15–30 lần/giây
+function setMask(P, d) {
+  const gl = P.gl, now = performance.now(), mk = new Uint8Array(d.mask), fresh = !P.haveMask || P.mw !== d.mw || P.mh !== d.mh;
+  const put = tex => {
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, tex);
+    if (fresh) gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, d.mw, d.mh, 0, gl.RED, gl.UNSIGNED_BYTE, mk);
+    else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, d.mw, d.mh, gl.RED, gl.UNSIGNED_BYTE, mk);
+  };
+  if (fresh) { put(P.m0); put(P.m1); P.mw = d.mw; P.mh = d.mh; }
+  else { put(P.m0); const t = P.m0; P.m0 = P.m1; P.m1 = t; }
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, P.m0);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, P.m1);
+  gl.activeTexture(gl.TEXTURE0);
+  P.mDt = P.mDt * .7 + Math.min(300, Math.max(30, now - P.mAt)) * .3; P.mAt = now; P.haveMask = true;
+}
+/* --- Cử chỉ tự động ---
+   👍 like · 👎 dislike · ✌️ peace · 🤟 love · ✊ giận · 👌 ok · ❤️ tim (1 tay / 2 tay) · 👋 vẫy tay · 👏 vỗ tay · 🙏 chắp tay */
+const CAT = { Thumb_Up: "like", Thumb_Down: "dislike", Victory: "peace", ILoveYou: "love", Closed_Fist: "angry" };
+const HOLD = { heart: 350, like: 400, dislike: 500, peace: 450, love: 450, ok: 450, angry: 900, pray: 800, hi: 0, clap: 0 }; // phải giữ cử chỉ ngần ấy ms mới bắn
+const D = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const curled = (h, tip, pip) => D(h[tip], h[0]) < D(h[pip], h[0]) * 1.05;
+const nCurl = h => curled(h, 12, 10) + curled(h, 16, 14) + curled(h, 20, 18);
+const open4 = h => !curled(h, 8, 6) && !curled(h, 12, 10) && !curled(h, 16, 14) && !curled(h, 20, 18);
+const hsize = h => D(h[0], h[9]) || 1e-3;
+const trim = (buf, now, ms) => { while (buf.length && now - buf[0].t > ms) buf.shift(); };
+function zig(a, th) { // đếm số lần đổi chiều có biên độ ≥ th (vẫy tay, vỗ tay)
+  let lo = a[0], hi = a[0], dir = 0, rev = 0;
+  for (const x of a) {
+    if (x > hi) hi = x; if (x < lo) lo = x;
+    if (dir <= 0 && x - lo > th) { if (dir < 0) rev++; dir = 1; hi = x; }
+    else if (dir >= 0 && hi - x > th) { if (dir > 0) rev++; dir = -1; lo = x; }
+  }
+  return rev;
+}
+let cand = null, lastG = 0; const wv = [], cld = [];
+function decide(hs, cats, now) {
+  const n = hs.length;
+  trim(wv, now, 1500); trim(cld, now, 1600);
+  if (n >= 2) {
+    const a = hs[0], b = hs[1], s = (hsize(a) + hsize(b)) / 2;
+    const up = (a[4].y + b[4].y) / 2 - (a[8].y + b[8].y) / 2;
+    if (D(a[4], b[4]) < .7 * s && D(a[8], b[8]) < .9 * s && up > .25 * s && nCurl(a) + nCurl(b) >= 4) return "heart"; // tim hai tay
+    if (open4(a) && open4(b)) {
+      const dc = D(a[9], b[9]) / s;
+      cld.push({ t: now, v: dc });
+      if (cld.length >= 5 && zig(cld.map(p => p.v), .8) >= 3) { cld.length = 0; return "clap"; }
+      if (dc < 1.1 && a[12].y < a[0].y - .6 * s && b[12].y < b[0].y - .6 * s) return "pray";
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const h = hs[i], s = hsize(h), pinch = D(h[4], h[8]);
+    if (pinch < .45 * s && nCurl(h) === 3 && D(h[8], h[0]) > 1.1 * s) return "heart";                 // tim một tay
+    if (pinch < .4 * s && !curled(h, 12, 10) && !curled(h, 16, 14) && !curled(h, 20, 18)) return "ok"; // 👌
+    const c = cats[i]; if (c && c[1] > .6 && CAT[c[0]]) return CAT[c[0]];
+    if (n === 1 && open4(h)) {                                                                         // vẫy tay
+      wv.push({ t: now, x: h[0].x }); 
+      if (wv.length >= 6 && zig(wv.map(p => p.x), .3 * s) >= 3) { wv.length = 0; return "hi"; }
+    }
+  }
+  return null;
+}
+function onHands(d) {
+  const now = performance.now(), asp = d.asp || 1;
+  const hs = d.hands.filter(h => h.length >= 21).map(h => h.map(p => ({ x: p[0] * asp, y: p[1] })));
+  const k = hs.length ? decide(hs, d.cats || [], now) : null;
+  if (!k) { if (cand && now - cand.last > 300) cand = null; return; }
+  if (!cand || cand.k !== k) cand = { k, since: now, last: now, fired: false }; else cand.last = now;
+  if (!cand.fired && now - cand.since >= HOLD[k] && now - lastG > 3000) { cand.fired = true; lastG = now; react(k); }
+}
+
+const vidReady = v => new Promise(res => { if (v.videoWidth) return res(); const t = setTimeout(res, 2500); v.addEventListener("loadedmetadata", () => { clearTimeout(t); res(); }, { once: true }); });
+async function applyFx() {
+  const seq = ++fxSeq;
+  syncFxUI();
+  if (!localStream || !rawCam) { if (needPix()) fxSay("Cần có camera để dùng hiệu ứng."); return; }
+  fxInit();
+  if (FX.face) askFace();
+  setSrc();
+  if (needPix()) { await vidReady($("srcvid")); if (seq !== fxSeq || !rawCam) return; }
+  if (FX.bg !== "off" && !fwSt.seg && !fwSt.dead) fxSay("Đang tải mô hình nền…");
+  try { if (needPix()) setVideoTrack(startPipe()); else { stopPipe(); setVideoTrack(rawCam); } }
+  catch { stopPipe(); FX.smooth = 0; FX.bg = "off"; FX.face = false; FX.look = "off"; saveFx(); syncFxUI(); setVideoTrack(rawCam); fxSay("Thiết bị không hỗ trợ hiệu ứng hình (cần WebGL2)."); }
+  anaSync();
+  if (FX.bg !== "off" && fwSt.seg) fxSay("Đã bật.");
+}
+$("fxbtn").onclick = () => { $("dev").classList.add("hidden"); $("fxp").classList.toggle("hidden"); pokeUI(); };
+$("beauty2").onchange = e => { FX.face = e.target.checked; saveFx(); applyFx(); };
+$("beauty").onchange = e => { FX.smooth = e.target.checked ? BEAUTY : 0; saveFx(); applyFx(); };
+$("lkchips").innerHTML = LOOKS.map(l => `<button data-lk="${l[0]}">${l[1]}</button>`).join("");
+document.querySelectorAll("#lkchips button").forEach(b => b.onclick = () => { FX.look = b.dataset.lk; saveFx(); applyFx(); });
+$("lkamt").oninput = e => { FX.la = +e.target.value; };   // kéo là thấy ngay, lưu khi thả tay
+$("lkamt").onchange = saveFx;
+document.querySelectorAll("#bgchips button").forEach(b => b.onclick = () => { FX.bg = b.dataset.bg; saveFx(); applyFx(); });
+// Tab bị ẩn thì trình duyệt làm chậm canvas: tạm gửi hình gốc, quay lại tab thì dùng lại hiệu ứng
+document.addEventListener("visibilitychange", () => { if (pipe && rawCam && localStream) setVideoTrack(document.hidden ? rawCam : pipe.track); });
+syncFxUI();
+
+async function start() {
+  room = clean($("code").value);
+  if (room.length < 3) { $("err").textContent = "Mã phòng cần ít nhất 3 ký tự (chữ không dấu hoặc số)."; return; }
+  $("err").textContent = "";
+  const typed = $("name").value.trim().slice(0, 20);
+  myName = typed || "Ẩn danh";
+  try { localStorage.setItem("vcall-name", typed); } catch {}
+  ending = false;
+  history.replaceState(null, "", "?room=" + room);
+  $("home").classList.add("hidden");
+  $("call").classList.remove("hidden");
+  setStatus("Đang kết nối…");
+  mediaReady = getMedia();
+  await Promise.race([iceReady, new Promise(r => setTimeout(r, 3000))]);
+  becomeHost();
+  keepAwake();
+  pokeUI();
+}
+
+function resetLinks() { stopShare(); hideScreen(); currentCall = null; chatConn = null; gotStream = false; peerHasMedia = false; clearInterval(statsTimer); clearTimeout(wd); }
+// Đồng hồ canh: nếu 2 phút mà chưa nối xong thì tự dựng lại, không bắt người dùng vào lại
+function armWatchdog() {
+  clearTimeout(wd);
+  wd = setTimeout(() => {
+    if (ending || retryPending) return;
+    if (!(connected && (!peerHasMedia || gotStream))) scheduleRetry("hết thời gian chờ");
+  }, 120000);
+}
+
+function becomeHost() {
+  clearTimeout(retryTimer); retryPending = false;
+  resetLinks(); peer?.destroy();
+  const p = peer = new Peer(PREFIX + room, { config: ICE });
+  p.on("open", () => setStatus("Đang chờ người ấy…", "Bấm biểu tượng liên kết ở góc trên rồi gửi cho người ấy"));
+  p.on("call", async call => {
+    if (call.metadata && call.metadata.screen) return incomingScreen(call);
+    armWatchdog();
+    await mediaReady;
+    call.answer(localStream, { sdpTransform });
+    attach(call);
+  });
+  p.on("connection", c => { armWatchdog(); const old = chatConn; setupChat(c); old?.close(); });
+  p.on("error", err => {
+    if (p !== peer) return;
+    if (err.type === "unavailable-id") becomeGuest();
+    else scheduleRetry(err.type);
+  });
+  p.on("disconnected", () => { if (p === peer && !p.destroyed) try { p.reconnect(); } catch {} });
+}
+
+function becomeGuest() {
+  resetLinks(); peer?.destroy();
+  const p = peer = new Peer({ config: ICE });
+  p.on("call", call => { if (call.metadata && call.metadata.screen) incomingScreen(call); else call.close(); });
+  p.on("open", async () => {
+    setStatus("Đang gọi…");
+    armWatchdog();
+    await mediaReady;
+    setupChat(p.connect(PREFIX + room, { reliable: true }));
+    attach(p.call(PREFIX + room, localStream, callOpts));
+  });
+  p.on("error", err => { if (p === peer) scheduleRetry(err.type === "peer-unavailable" ? "" : err.type, err.type === "peer-unavailable" ? 900 + Math.random() * 900 : 0); });
+  p.on("disconnected", () => { if (p === peer && !p.destroyed) try { p.reconnect(); } catch {} });
+}
+
+function scheduleRetry(why, delay) {
+  if (ending || retryPending) return;
+  retryPending = true; connected = false; remoteHasVideo = false;
+  resetLinks();
+  const old = peer; peer = null; try { old?.destroy(); } catch {}
+  $("remote").classList.remove("on");
+  $("novideo").classList.add("hidden");
+  $("zoomctl").classList.add("hidden"); expanded = true; resetZoom(); fitVideos();
+  setStatus("Đang nối lại…", why || "");
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(becomeHost, delay || 1800 + Math.random() * 1200);
+}
+
+// Đã nối được (qua hình hoặc qua tin nhắn)
+function onLinked() {
+  if (!connected) { connected = true; lvl = 0; badN = goodN = 0; }
+  $("status").classList.add("gone");
+  setTimeout(() => { if (connected && !remoteHasVideo) noVideoMode(); }, 3000);
+  pokeUI();
+}
+function noVideoMode() {
+  $("novideo").classList.remove("hidden");
+  if (!chatOpen) toggleChat(true);
+}
+
+function attach(call) {
+  if (currentCall && currentCall !== call) { const old = currentCall; currentCall = null; old.close(); }
+  currentCall = call;
+  let dropTimer;
+  call.on("stream", stream => {
+    gotStream = true;
+    remoteHasVideo = stream.getVideoTracks().length > 0;
+    $("remote").srcObject = stream;
+    onLinked();
+    if (remoteHasVideo) { $("remote").classList.add("on"); $("novideo").classList.add("hidden"); $("zoomctl").classList.remove("hidden"); fitVideos(); showHint(); }
+    else noVideoMode();
+    tuneSenders(call);
+    watchStats(call);
+  });
+  call.on("close", () => { if (currentCall === call && !ending) scheduleRetry(); });
+  call.on("error", () => { if (currentCall === call) call.close(); });
+  const pc = call.peerConnection;
+  pc.addEventListener("iceconnectionstatechange", () => {
+    clearTimeout(dropTimer);
+    const s = pc.iceConnectionState;
+    if (s === "disconnected") { $("q").className = "bad"; dropTimer = setTimeout(() => call.close(), 7000); }
+    if (s === "failed") call.close();
+  });
+}
+
+function tuneSenders(call) {
+  try {
+    call.peerConnection.getSenders().forEach(async s => {
+      if (!s.track) return;
+      const p = s.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      if (s.track.kind === "video") {
+        p.encodings[0].maxBitrate = LEVELS[lvl].bitrate;
+        p.encodings[0].scaleResolutionDownBy = LEVELS[lvl].scale;
+        p.encodings[0].maxFramerate = 30;
+        p.degradationPreference = "maintain-framerate";
+      } else {
+        p.encodings[0].maxBitrate = 64000;
+      }
+      await s.setParameters(p);
+    });
+  } catch {}
+}
+
+function watchStats(call) {
+  clearInterval(statsTimer);
+  statsTimer = setInterval(async () => {
+    try {
+      const stats = await call.peerConnection.getStats();
+      let rtt = 0, lost = 0, recv = 0, outLoss = 0;
+      stats.forEach(r => {
+        if (r.type === "candidate-pair" && r.state === "succeeded" && r.nominated) rtt = (r.currentRoundTripTime || 0) * 1000;
+        if (r.type === "remote-inbound-rtp" && r.kind === "video") outLoss = r.fractionLost || 0;
+        if (r.type === "inbound-rtp" && r.kind === "video") { lost = r.packetsLost || 0; recv = r.packetsReceived || 0; }
+      });
+      const loss = Math.max(recv ? lost / (lost + recv) : 0, outLoss);
+      const cls = (rtt > 400 || loss > .08) ? "bad" : (rtt > 200 || loss > .03) ? "mid" : "good";
+      $("q").className = cls;
+      if (cls === "bad") { goodN = 0; if (++badN >= 2 && lvl < LEVELS.length - 1) { lvl++; badN = 0; tuneSenders(call); } }
+      else if (cls === "good") { badN = 0; if (++goodN >= 5 && lvl > 0) { lvl--; goodN = 0; tuneSenders(call); } }
+      else badN = goodN = 0;
+    } catch {}
+  }, 3000);
+}
+
+/* ---------- Nhắn tin ---------- */
+function setupChat(conn) {
+  chatConn = conn;
+  const hi = () => { Promise.resolve(mediaReady).then(() => { try { conn.send({ t: "name", n: myName, m: localStream.getTracks().length > 0 }); } catch {} }); onLinked(); };
+  conn.on("open", hi);
+  if (conn.open) hi();
+  conn.on("data", d => {
+    if (!d) return;
+    if (d.t === "chat" && typeof d.m === "string") addMsg(d.m.slice(0, 500), false);
+    else if (d.t === "name" && typeof d.n === "string") {
+      peerName = d.n.slice(0, 20); peerHasMedia = !!d.m;
+      $("peername").textContent = peerName; $("peername").classList.remove("hidden");
+      $("nvname").textContent = peerName + " chưa có hình";
+    }
+    else if (d.t === "react" && REACTS.includes(d.k)) {
+      const now = Date.now(); if (now - lastFx < 250) return; lastFx = now;
+      fx(d.k); cap((peerName || "Người ấy") + " " + CAPS[d.k]);
+      if (navigator.vibrate) navigator.vibrate(40);
+    }
+    else if (d.t === "sticker" && typeof d.v === "string") {
+      if (d.k === "e" && d.v.length <= 12) addSticker("e", d.v, false);
+      else if (d.k === "i" && d.v.length < 150000 && /^data:image\/(webp|png|jpeg);base64,/.test(d.v)) addSticker("i", d.v, false);
+    }
+  });
+  conn.on("close", () => { if (chatConn === conn && !ending) scheduleRetry(); });
+  conn.on("error", () => {});
+}
+function addMsg(text, me) {
+  const d = document.createElement("div");
+  d.className = "m " + (me ? "me" : "them");
+  if (!me && peerName) { const n = document.createElement("small"); n.textContent = peerName; d.appendChild(n); }
+  d.appendChild(document.createTextNode(text));
+  const box = $("msgs");
+  box.appendChild(d);
+  while (box.children.length > 100) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+  if (!me && !chatOpen) $("chatbtn").classList.add("dot");
+}
+function sendMsg() {
+  const t = $("msg").value.trim();
+  if (!t) return;
+  if (!chatConn || !chatConn.open) { $("msg").placeholder = "Chưa kết nối, thử lại sau giây lát…"; return; }
+  chatConn.send({ t: "chat", m: t });
+  addMsg(t, true);
+  $("msg").value = ""; $("msg").placeholder = "Nhắn tin…";
+}
+function saveStickers() {
+  try { localStorage.setItem("vcall-stickers", JSON.stringify(customStickers)); }
+  catch { customStickers.shift(); alert("Bộ nhớ trình duyệt đầy, không lưu được sticker này."); }
+}
+function stickerEl(k, v) {
+  if (k === "e") { const s = document.createElement("span"); s.textContent = v; return s; }
+  const im = new Image(); im.src = v; return im;
+}
+function addSticker(k, v, me) {
+  const d = document.createElement("div");
+  d.className = "m st " + (me ? "me" : "them");
+  d.style.background = "none";
+  d.appendChild(stickerEl(k, v));
+  const box = $("msgs");
+  box.appendChild(d);
+  while (box.children.length > 100) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+  if (!me) {
+    const p = document.createElement("div"); p.id = "pop"; p.appendChild(stickerEl(k, v));
+    $("pop")?.remove(); $("call").appendChild(p); setTimeout(() => p.remove(), 2300);
+    if (!chatOpen) $("chatbtn").classList.add("dot");
+  }
+}
+function sendSticker(k, v) {
+  if (!chatConn || !chatConn.open) { $("msg").placeholder = "Chưa kết nối, thử lại sau giây lát…"; return; }
+  chatConn.send({ t: "sticker", k, v });
+  addSticker(k, v, true);
+  $("tray").classList.add("hidden");
+}
+function renderTray() {
+  const t = $("tray"); t.innerHTML = "";
+  EMOJIS.forEach(e => { const b = document.createElement("button"); b.textContent = e; b.onclick = () => sendSticker("e", e); t.appendChild(b); });
+  customStickers.forEach((src, i) => {
+    const b = document.createElement("button"); b.appendChild(stickerEl("i", src));
+    let tm, held = false;
+    b.onpointerdown = () => { held = false; tm = setTimeout(() => { held = true; if (confirm("Xóa sticker này?")) { customStickers.splice(i, 1); saveStickers(); renderTray(); } }, 700); };
+    b.onpointerup = b.onpointerleave = b.onpointercancel = () => clearTimeout(tm);
+    b.onclick = () => { if (!held) sendSticker("i", src); };
+    t.appendChild(b);
+  });
+  const add = document.createElement("button");
+  add.id = "addst"; add.textContent = "＋"; add.title = "Tạo sticker từ ảnh của bạn";
+  add.onclick = () => $("file").click();
+  t.appendChild(add);
+}
+// Ảnh của bạn → thu nhỏ về sticker vuông nhẹ, lưu vào máy
+$("file").onchange = e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const url = URL.createObjectURL(f), img = new Image();
+  img.onload = () => {
+    let out = "";
+    for (const size of [256, 192, 128]) {
+      const c = document.createElement("canvas"); c.width = c.height = size;
+      const r = Math.min(size / img.width, size / img.height), w = img.width * r, h = img.height * r;
+      c.getContext("2d").drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      out = c.toDataURL("image/webp", .85);
+      if (!out.startsWith("data:image/webp")) out = c.toDataURL("image/png");
+      if (out.length < 90000) break;
+    }
+    URL.revokeObjectURL(url);
+    if (out.length >= 150000) { alert("Ảnh quá nặng, hãy chọn ảnh khác nhé."); return; }
+    customStickers.unshift(out); customStickers = customStickers.slice(0, 24);
+    saveStickers(); renderTray();
+  };
+  img.onerror = () => alert("Không đọc được ảnh này.");
+  img.src = url;
+};
+$("stk").onclick = () => $("tray").classList.toggle("hidden");
+renderTray();
+
+function toggleChat(force) {
+  chatOpen = typeof force === "boolean" ? force : !chatOpen;
+  $("chat").classList.toggle("hidden", !chatOpen);
+  $("chatbtn").classList.toggle("off", chatOpen);
+  if (chatOpen) { $("chatbtn").classList.remove("dot"); $("msgs").scrollTop = $("msgs").scrollHeight; }
+  pokeUI();
+}
+$("chatbtn").onclick = () => toggleChat();
+$("send").onclick = sendMsg;
+$("msg").addEventListener("keydown", e => { if (e.key === "Enter") sendMsg(); });
+// Bàn phím điện thoại không che ô nhập
+if (window.visualViewport) {
+  const fit = () => { $("call").style.height = visualViewport.height + "px"; $("call").style.top = visualViewport.offsetTop + "px"; };
+  visualViewport.addEventListener("resize", fit); visualViewport.addEventListener("scroll", fit);
+}
+
+/* ---------- Khung hình: không phóng to / cắt xén ---------- */
+// Hình người ấy: gần đúng tỉ lệ màn hình thì phủ kín, lệch nhiều thì hiện đủ khung (không bị zoom)
+// Hình của mình: khung xem trước theo đúng tỉ lệ camera
+let expanded = true, hintTimer;
+function fitVideos() {
+  const r = $("remote"), l = $("local");
+  if (l.videoWidth) l.style.aspectRatio = l.videoWidth + " / " + l.videoHeight;
+  if (r.videoWidth) r.style.setProperty("--ra", r.videoWidth + " / " + r.videoHeight);
+  r.classList.toggle("big", expanded && !screenIn); r.classList.toggle("pip", screenIn);
+  let w, h;
+  if (screenIn) {
+    const a = r.videoWidth && r.videoHeight ? r.videoWidth / r.videoHeight : 3 / 4, pw = Math.min(innerWidth * .28, 160);
+    w = pw + "px"; h = pw / a + "px";
+  } else if (expanded) { w = "100%"; h = "100%"; }
+  else {
+    const a = r.videoWidth && r.videoHeight ? r.videoWidth / r.videoHeight : 3 / 4;
+    let pw = Math.min(innerWidth * 0.64, 320), ph = pw / a;
+    const maxH = innerHeight * 0.45;
+    if (ph > maxH) { ph = maxH; pw = ph * a; }
+    w = pw + "px"; h = ph + "px";
+    $("hint").style.top = (innerHeight / 2 + ph / 2 + 14) + "px";
+  }
+  r.style.width = w; r.style.height = h;
+}
+function showHint() {
+  $("hint").classList.remove("hidden");
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => $("hint").classList.add("hidden"), 4500);
+}
+/* Zoom bằng 2 ngón (hoặc con lăn chuột), kéo để di chuyển, chạm đúp để zoom, chạm 1 lần để phóng to/thu nhỏ khung */
+let Z = 1, PX = 0, PY = 0, pinch = null, tapT = 0, tapTimer, moved = false;
+const ptrs = new Map(), R = $("remote");
+function applyZoom() {
+  Z = Math.min(5, Math.max(1, Z));
+  const t = screenIn ? $("screen") : R, full = expanded || screenIn;
+  const W = full ? $("call").clientWidth : t.offsetWidth, H = full ? $("call").clientHeight : t.offsetHeight;
+  const mx = (Z - 1) * W / 2, my = (Z - 1) * H / 2;
+  PX = Math.max(-mx, Math.min(mx, PX)); PY = Math.max(-my, Math.min(my, PY));
+  if (Z === 1) { PX = 0; PY = 0; }
+  [R, $("screen")].forEach(el => { const on = el === t; el.style.setProperty("--z", on ? Z : 1); el.style.setProperty("--px", (on ? PX : 0) + "px"); el.style.setProperty("--py", (on ? PY : 0) + "px"); });
+  $("zlbl").textContent = (Math.round(Z * 10) / 10) + "×"; $("zslide").value = Z;
+}
+function setExpanded(v) {
+  expanded = v; $("hint").classList.add("hidden");
+  if (!v) { Z = 1; PX = 0; PY = 0; }
+  applyZoom(); fitVideos(); pokeUI();
+}
+function zoomAt(nz, mx, my) { // mx,my: điểm zoom, tính từ tâm màn hình
+  nz = Math.min(5, Math.max(1, nz));
+  const k = nz / Z; PX = mx - (mx - PX) * k; PY = my - (my - PY) * k; Z = nz; applyZoom();
+}
+function center() { const b = $("call").getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }
+function resetZoom() { Z = 1; PX = 0; PY = 0; applyZoom(); }
+const onDown = e => {
+  if (e.currentTarget === R && (screenIn || swapped)) return;
+  e.currentTarget.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+  if (ptrs.size === 1) moved = false;
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    moved = true; clearTimeout(tapTimer); tapT = 0;
+  }
+};
+const onMove = e => {
+  const p = ptrs.get(e.pointerId); if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (ptrs.size === 2 && pinch) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y), c = center();
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    if (!expanded && !screenIn) setExpanded(true);
+    zoomAt(Z * d / pinch.d, mx - c.x, my - c.y);
+    PX += mx - pinch.mx; PY += my - pinch.my; pinch.d = d; pinch.mx = mx; pinch.my = my; applyZoom();
+  } else if (ptrs.size === 1) {
+    if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) moved = true;
+    if (Z > 1) { PX += dx; PY += dy; applyZoom(); }
+  }
+};
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (e.type === "pointercancel" || ptrs.size > 0 || moved) return;
+  const now = Date.now();
+  if (now - tapT < 300) {              // chạm đúp: zoom vào điểm chạm / về 1×
+    clearTimeout(tapTimer); tapT = 0;
+    if (Z > 1) resetZoom();
+    else { const c = center(); if (!expanded && !screenIn) setExpanded(true); zoomAt(2.5, e.clientX - c.x, e.clientY - c.y); }
+  } else {                             // chạm 1 lần: phóng to/thu nhỏ khung (đang zoom thì về 1×)
+    tapT = now;
+  }
+}
+[R, $("screen")].forEach(el => {
+  el.addEventListener("pointerdown", onDown); el.addEventListener("pointermove", onMove);
+  el.addEventListener("pointerup", endPtr); el.addEventListener("pointercancel", endPtr);
+  el.addEventListener("wheel", e => {
+    if (el === R && (screenIn || swapped)) return;
+    e.preventDefault(); const c = center();
+    if (!expanded && !screenIn) setExpanded(true);
+    zoomAt(Z * Math.exp(-e.deltaY * 0.0015), e.clientX - c.x, e.clientY - c.y);
+  }, { passive: false });
+});
+$("zslide").addEventListener("input", () => {
+  const v = parseFloat($("zslide").value);
+  if (!expanded && !screenIn) setExpanded(true);
+  zoomAt(v, 0, 0); pokeUI();
+});
+$("zlbl").onclick = () => { resetZoom(); pokeUI(); };
+/* ---------- Chia sẻ màn hình (gửi qua một cuộc gọi riêng, không đụng tới camera) ---------- */
+function incomingScreen(call) {
+  if (!currentCall || call.peer !== currentCall.peer) { call.close(); return; }
+  call.answer();
+  screenCall = call;
+  call.on("stream", st => {
+    screenIn = true; setSwap(false);
+    $("screen").srcObject = st; $("screen").classList.remove("hidden");
+    $("zoomctl").classList.remove("hidden");
+    resetZoom(); fitVideos(); pokeUI();
+    cap((peerName || "Người ấy") + " đang chia sẻ màn hình 🖥️");
+  });
+  call.on("close", () => { if (screenCall === call) hideScreen(); });
+}
+function hideScreen() {
+  const c = screenCall; screenCall = null; screenIn = false;
+  try { c?.close(); } catch {}
+  $("screen").srcObject = null; $("screen").classList.add("hidden");
+  if (!R.classList.contains("on")) $("zoomctl").classList.add("hidden");
+  resetZoom(); fitVideos();
+}
+async function startShare() {
+  if (shareStream) return stopShare();
+  if (!peer || !currentCall || !connected) { cap("Chưa kết nối, thử lại sau giây lát"); return; }
+  try { shareStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: false }); }
+  catch { return; }
+  const vt = shareStream.getVideoTracks()[0];
+  if ("contentHint" in vt) vt.contentHint = "detail";
+  vt.onended = stopShare;
+  const c = shareCall = peer.call(currentCall.peer, shareStream, { metadata: { screen: true }, sdpTransform });
+  c.on("close", () => { if (shareCall === c) stopShare(); });
+  setTimeout(() => {
+    try {
+      c.peerConnection.getSenders().forEach(async s => {
+        if (!s.track || s.track.kind !== "video") return;
+        const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+        p.encodings[0].maxBitrate = 4000000; p.degradationPreference = "maintain-resolution";
+        await s.setParameters(p);
+      });
+    } catch {}
+  }, 1500);
+  $("share").classList.add("off");
+  cap("Bạn đang chia sẻ màn hình 🖥️");
+}
+function stopShare() {
+  const c = shareCall; shareCall = null;
+  shareStream?.getTracks().forEach(t => t.stop()); shareStream = null;
+  try { c?.close(); } catch {}
+  $("share").classList.remove("off");
+}
+$("share").onclick = startShare;
+if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) $("share").classList.add("hidden");
+// iOS Safari: chặn zoom cả trang khi chụm 2 ngón
+["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+["loadedmetadata", "resize"].forEach(ev => $("remote").addEventListener(ev, fitVideos));
+/* Chạm đúp vào khung nhỏ để đổi chỗ: hình mình phóng to, hình người ấy thu nhỏ (chạm đúp lần nữa để trả lại) */
+let swapped = false;
+function setSwap(v) {
+  if (v && (screenIn || $("local").classList.contains("hidden"))) return;
+  swapped = v; $("call").classList.toggle("swap", v);
+  if (v) { resetZoom(); $("hint").classList.add("hidden"); }
+  fitVideos(); pokeUI();
+}
+function onDouble(el, fn) {
+  let t = 0, x = 0, y = 0, d = null;
+  el.addEventListener("pointerdown", e => { d = { x: e.clientX, y: e.clientY }; });
+  el.addEventListener("pointerup", e => {
+    if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) { d = null; return; }
+    d = null; const n = Date.now();
+    if (n - t < 320 && Math.hypot(e.clientX - x, e.clientY - y) < 48) { t = 0; fn(); } else { t = n; x = e.clientX; y = e.clientY; }
+  });
+}
+function bindLocal(el) {
+  ["loadedmetadata", "resize"].forEach(ev => el.addEventListener(ev, fitVideos));
+  onDouble(el, () => setSwap(!swapped));
+}
+bindLocal($("local"));
+onDouble($("remote"), () => { if (swapped) setSwap(false); });
+addEventListener("resize", fitVideos);
+
+/* ---------- Hiệu ứng cảm xúc ---------- */
+const REACTS = ["laugh", "heart", "like", "angry", "kiss", "cheek", "cry", "dislike", "peace", "love", "ok", "pray", "hi", "clap"];
+const CAPS = { laugh: "cười ha ha 😆", heart: "thả tim cho bạn 💕", like: "thích bạn lắm 👍", angry: "đang giận nè 😤", kiss: "gửi bạn một nụ hôn 😘", cheek: "thơm má bạn nè 😚", cry: "đang khóc huhu 😭", dislike: "không thích lắm 👎", peace: "gửi bạn dấu hòa bình ✌️", love: "yêu bạn lắm 🤟", ok: "bảo OK nè 👌", pray: "cảm ơn bạn nhé 🙏", hi: "vẫy tay chào bạn 👋", clap: "đang vỗ tay 👏" };
+const BOUNCE = "cubic-bezier(.34,1.56,.64,1)";
+const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+const tf = (x, y, sc = 1, r = 0) => `translate(${x}px,${y}px) translate(-50%,-50%) scale(${sc}) rotate(${r}deg)`;
+let lastReact = 0, lastFx = 0;
+
+function fx(kind) {
+  const box = $("fx"), W = box.clientWidth, H = box.clientHeight, cx = W / 2, cy = H / 2;
+  const add = (txt, size, frames, dur, delay = 0, cls = "", color = "") => {
+    const e = document.createElement("span");
+    e.className = "fxi " + cls; e.textContent = txt; e.style.fontSize = size + "px";
+    if (color) e.style.color = color;
+    box.appendChild(e);
+    e.animate(frames, { duration: dur, delay, easing: "ease-out", fill: "both" }).onfinish = () => e.remove();
+  };
+  const word = (txt, color, y) => add(txt, 40, [
+    { opacity: 0, transform: tf(cx, y + 30, .3), easing: BOUNCE }, { opacity: 1, transform: tf(cx, y, 1), offset: .2 },
+    { opacity: 1, offset: .75 }, { opacity: 0, transform: tf(cx, y - 40, 1) }], 2000, 200, "fxt", color);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    add({ laugh: "😂", heart: "💖", like: "👍", angry: "😡", kiss: "😘", cheek: "😚", cry: "😭", dislike: "👎", peace: "✌️", love: "🤟", ok: "👌", pray: "🙏", hi: "👋", clap: "👏" }[kind], 96,
+      [{ opacity: 0, transform: tf(cx, cy) }, { opacity: 1, transform: tf(cx, cy), offset: .2 }, { opacity: 0, transform: tf(cx, cy) }], 1600);
+    return;
+  }
+  const SIMPLE = {
+    dislike: ["👎", ["💔", "😒", "🥀"], "Hừm…", "var(--blue-1)"], peace: ["✌️", ["✨", "🎉", "⭐"], "Yeah!", "var(--yel-1)"],
+    love: ["🤟", ["💖", "✨", "💫"], "Yêu bạn!", "var(--pink-1)"], ok: ["👌", ["✨", "✅", "⭐"], "OK nha!", "var(--yel-1)"],
+    pray: ["🙏", ["✨", "🌸", "💫"], "Cảm ơn nhé!", "var(--yel-1)"], hi: ["👋", ["✨", "💫", "🌟"], "Xin chào!", "var(--blue-1)"],
+    clap: ["👏", ["🎉", "✨", "🎊"], "Hoan hô!", "var(--yel-1)"] }[kind];
+  if (SIMPLE) {
+    const f = [{ opacity: 0, transform: tf(cx, cy + 40, 0, -30), easing: BOUNCE }, { opacity: 1, transform: tf(cx, cy, 1.2, 8), offset: .2 }];
+    if (kind === "hi" || kind === "clap" || kind === "pray") for (let i = 0; i < 8; i++) f.push({ opacity: 1, transform: tf(cx, cy, 1.15, i % 2 ? 18 : -18), offset: .2 + .55 * (i + 1) / 8 });
+    else f.push({ transform: tf(cx, cy, 1, 0), offset: .6 });
+    f.push({ opacity: 1, offset: .75 }, { opacity: 0, transform: tf(cx, cy - 120, 1) });
+    add(SIMPLE[0], 120, f, 1900);
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2, d = rnd(90, 150);
+      add(pick(SIMPLE[1]), rnd(22, 36), [{ opacity: 0, transform: tf(cx, cy, .2) }, { opacity: 1, offset: .2 },
+        { opacity: 0, transform: tf(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.1, rnd(-40, 40)) }], 1300, 150);
+    }
+    word(SIMPLE[2], SIMPLE[3], cy + 120);
+    return;
+  }
+  if (kind === "heart") {
+    for (let i = 0; i < 18; i++) {
+      const x = rnd(W * .06, W * .94), dx = rnd(-50, 50), end = rnd(H * .08, H * .45);
+      add(pick(["❤️", "💖", "💗", "💕", "💘"]), rnd(30, 58), [
+        { opacity: 0, transform: tf(x, H + 40, .4, rnd(-20, 20)) }, { opacity: 1, offset: .15 }, { opacity: 1, offset: .7 },
+        { opacity: 0, transform: tf(x + dx, end, 1.1, rnd(-25, 25)) }], rnd(2200, 3400), i * 110);
+    }
+  } else if (kind === "laugh") {
+    for (let i = 0; i < 10; i++) {
+      const x = rnd(W * .1, W * .9), y = rnd(H * .3, H * .75);
+      add(pick(["😂", "🤣", "😆"]), rnd(44, 80), [
+        { opacity: 0, transform: tf(x, y + 30, 0, -20), easing: BOUNCE }, { opacity: 1, transform: tf(x, y, 1.25, 12), offset: .25 },
+        { transform: tf(x, y, 1, -10), offset: .4 }, { transform: tf(x, y, 1.1, 10), offset: .55 },
+        { opacity: 1, offset: .8 }, { opacity: 0, transform: tf(x, y - 70, 1, 0) }], 1900, i * 120);
+    }
+    word("Ha ha ha!", "var(--yel-1)", cy);
+  } else if (kind === "like") {
+    add("👍", 120, [
+      { opacity: 0, transform: tf(cx, cy + 40, 0, -30), easing: BOUNCE }, { opacity: 1, transform: tf(cx, cy, 1.2, 8), offset: .25 },
+      { transform: tf(cx, cy, 1, 0), offset: .6 }, { opacity: 1, offset: .75 }, { opacity: 0, transform: tf(cx, cy - 120, 1) }], 1900);
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2, d = rnd(90, 150);
+      add(pick(["✨", "⭐", "💫"]), rnd(22, 36), [
+        { opacity: 0, transform: tf(cx, cy, .2) }, { opacity: 1, offset: .2 },
+        { opacity: 0, transform: tf(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.1, rnd(-40, 40)) }], 1300, 150);
+    }
+    word("Tuyệt vời!", "var(--blue-1)", cy + 120);
+  } else if (kind === "angry") {
+    const f = [{ opacity: 0, transform: tf(cx, cy, .3) }, { opacity: 1, transform: tf(cx, cy, 1.2), offset: .1 }];
+    for (let i = 0; i < 12; i++) f.push({ opacity: 1, transform: tf(cx + (i % 2 ? 14 : -14), cy, 1.2 + (i % 3) * .04, i % 2 ? 4 : -4), offset: .1 + .65 * (i + 1) / 12 });
+    f.push({ opacity: 0, transform: tf(cx, cy - 40, 1.2) });
+    add("😡", 110, f, 2000);
+    const m = (sc) => tf(cx + 70, cy - 70, sc);
+    add("💢", 64, [{ opacity: 0, transform: m(.2) }, { opacity: 1, transform: m(1.3), offset: .2 }, { transform: m(.9), offset: .4 }, { transform: m(1.3), offset: .6 }, { opacity: 0, transform: m(1) }], 2000);
+    for (let i = 0; i < 6; i++) {
+      const dir = i % 2 ? 1 : -1, x = cx + dir * 80;
+      add("💨", rnd(36, 52), [{ opacity: 0, transform: tf(x, cy + 20) }, { opacity: .9, offset: .3 },
+        { opacity: 0, transform: tf(x + dir * rnd(40, 90), cy - rnd(80, 140), 1.3) }], rnd(1200, 1700), rnd(0, 700));
+    }
+    word("Hừmmm!", "var(--pink-1)", cy + 120);
+  } else if (kind === "kiss") {
+    add("😘", 120, [
+      { opacity: 0, transform: tf(cx, cy + 40, 0, -20), easing: BOUNCE }, { opacity: 1, transform: tf(cx, cy, 1.2, -8), offset: .25 },
+      { transform: tf(cx, cy, 1, 6), offset: .5 }, { opacity: 1, offset: .75 }, { opacity: 0, transform: tf(cx, cy - 100, 1) }], 2000);
+    for (let i = 0; i < 8; i++) {
+      const a = rnd(-Math.PI * .9, -Math.PI * .1), d = rnd(90, 170);
+      add(pick(["💋", "💕", "💖"]), rnd(28, 50), [
+        { opacity: 0, transform: tf(cx + 30, cy, .3) }, { opacity: 1, offset: .2 },
+        { opacity: 0, transform: tf(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.1, rnd(-30, 30)) }], rnd(1300, 1900), 250 + i * 110);
+    }
+    word("Chụt chụt!", "var(--pink-1)", cy + 120);
+  } else if (kind === "cheek") {
+    add("😚", 110, [
+      { opacity: 0, transform: tf(-60, cy, 1, -15) }, { opacity: 1, transform: tf(cx - 70, cy, 1.1, 8), offset: .3, easing: BOUNCE },
+      { transform: tf(cx - 40, cy, 1.15, 14), offset: .45 }, { transform: tf(cx - 70, cy, 1.1, 8), offset: .6 },
+      { opacity: 1, offset: .8 }, { opacity: 0, transform: tf(cx - 70, cy - 60, 1) }], 2200);
+    add("😊", 100, [
+      { opacity: 0, transform: tf(cx + 80, cy, .6) }, { opacity: 1, transform: tf(cx + 80, cy, 1), offset: .2, easing: BOUNCE },
+      { opacity: 1, offset: .8 }, { opacity: 0, transform: tf(cx + 80, cy - 60, 1) }], 2200);
+    const lip = sc => tf(cx + 55, cy + 5, sc, -20);
+    add("💋", 64, [
+      { opacity: 0, transform: lip(0) }, { opacity: 0, transform: lip(0), offset: .4 },
+      { opacity: 1, transform: lip(1.5), offset: .5, easing: BOUNCE }, { transform: lip(1), offset: .62 },
+      { opacity: 1, offset: .8 }, { opacity: 0, transform: lip(1) }], 2200);
+    for (let i = 0; i < 6; i++) {
+      const x = cx + rnd(-60, 100);
+      add("💕", rnd(26, 40), [{ opacity: 0, transform: tf(x, cy + 20, .4) }, { opacity: 1, offset: .25 },
+        { opacity: 0, transform: tf(x + rnd(-30, 30), cy - rnd(120, 200), 1.1) }], rnd(1300, 1800), 900 + i * 120);
+    }
+    word("Thơm má!", "var(--yel-1)", cy + 120);
+  } else if (kind === "cry") {
+    const f = [{ opacity: 0, transform: tf(cx, cy, .3) }, { opacity: 1, transform: tf(cx, cy, 1.2), offset: .12 }];
+    for (let i = 0; i < 14; i++) f.push({ opacity: 1, transform: tf(cx + (i % 2 ? 5 : -5), cy + (i % 3 ? 0 : 3), 1.2, i % 2 ? 3 : -3), offset: .12 + .68 * (i + 1) / 14 });
+    f.push({ opacity: 0, transform: tf(cx, cy + 20, 1.2) });
+    add("😭", 110, f, 2400);
+    add("☁️", 90, [{ opacity: 0, transform: tf(cx, cy - 110, .4) }, { opacity: 1, transform: tf(cx, cy - 120, 1), offset: .2 },
+      { opacity: 1, offset: .8 }, { opacity: 0, transform: tf(cx + 30, cy - 120, 1) }], 2400);
+    for (let i = 0; i < 14; i++) {
+      const side = i % 2 ? 1 : -1, x = cx + side * rnd(28, 50);
+      add("💧", rnd(22, 34), [{ opacity: 0, transform: tf(x, cy + 10, .6) }, { opacity: 1, offset: .15 }, { opacity: .9, offset: .7 },
+        { opacity: 0, transform: tf(x + side * rnd(10, 40), cy + rnd(180, 320), 1) }], rnd(1100, 1600), i * 140);
+    }
+    word("Huhu…", "var(--blue-1)", cy + 130);
+  }
+}
+function cap(text) {
+  const c = document.createElement("div"); c.className = "fxcap"; c.textContent = text;
+  $("fx").appendChild(c);
+  c.animate([{ opacity: 0 }, { opacity: 1, offset: .12 }, { opacity: 1, offset: .8 }, { opacity: 0 }], { duration: 2600 }).onfinish = () => c.remove();
+}
+function react(k) {
+  const now = Date.now(); if (now - lastReact < 350) return; lastReact = now;
+  if (chatConn && chatConn.open) { try { chatConn.send({ t: "react", k }); } catch {} }
+  fx(k);
+}
+document.querySelectorAll("#react button").forEach(b => b.onclick = () => react(b.dataset.k));
+$("reactbtn").onclick = () => { $("reactbtn").classList.toggle("act", $("react").classList.toggle("open")); pokeUI(); };
+
+/* ---------- Tiện ích ---------- */
+async function keepAwake() { try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !$("call").classList.contains("hidden")) {
+    keepAwake();
+    if (!connected && !ending && !peer?.open) becomeHost();
+  }
+});
+window.addEventListener("online", () => { if (!connected && !ending && !$("call").classList.contains("hidden")) becomeHost(); });
+
+function pokeUI() {
+  document.querySelectorAll(".ui").forEach(e => e.classList.remove("away"));
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (connected && remoteHasVideo && !chatOpen && $("dev").classList.contains("hidden") && $("fxp").classList.contains("hidden")) document.querySelectorAll(".ui").forEach(e => e.classList.add("away"));
+  }, 4000);
+}
+$("call").addEventListener("pointerdown", pokeUI);
+
+$("mic").onclick = e => {
+  const t = localStream.getAudioTracks()[0]; if (!t) return; t.enabled = !t.enabled;
+  e.currentTarget.classList.toggle("off", !t.enabled);
+};
+$("cam").onclick = e => {
+  const t = localStream.getVideoTracks()[0]; if (!t) return; t.enabled = !t.enabled;
+  e.currentTarget.classList.toggle("off", !t.enabled);
+};
+$("flip").onclick = async () => {
+  const prev = facing;
+  facing = facing === "user" ? "environment" : "user";
+  try {
+    await getMedia(true);
+    const senders = currentCall?.peerConnection?.getSenders() || [];
+    for (const k of ["video", "audio"]) {
+      const s = senders.find(x => x.track && x.track.kind === k), t = localStream.getTracks().find(x => x.kind === k);
+      if (s && t) await s.replaceTrack(t);
+    }
+  } catch { facing = prev; await getMedia(); }
+};
+$("end").onclick = () => {
+  ending = true;
+  stopShare(); currentCall?.close(); chatConn?.close(); peer?.destroy();
+  localStream?.getTracks().forEach(t => t.stop());
+  try { wake?.release(); } catch {}
+  history.replaceState(null, "", location.pathname);
+  location.reload();
+};
+$("copy").onclick = async () => {
+  const link = location.origin + location.pathname + "?room=" + room;
+  try { await navigator.clipboard.writeText(link); { $("copylbl").textContent = "Đã sao chép ✓"; cap("Đã sao chép link ✓"); }; }
+  catch { prompt("Sao chép link này:", link); }
+  setTimeout(() => $("copylbl").textContent = "Sao chép link", 2000);
+};
+</script>
+</body>
+</html>
