@@ -607,7 +607,7 @@ float skinOf(vec3 m) {
   return smoothstep(.27, .32, cb) * (1. - smoothstep(.49, .54, cb)) * smoothstep(.49, .53, cr) * (1. - smoothstep(.66, .70, cr)) * smoothstep(.15, .3, Y);
 }
 void main() {
-  vec2 uv = vUv; float ar = px.y / px.x; vec2 asp = vec2(ar, 1.);
+  float smx = max(sm, fa * .6); vec2 uv = vUv; float ar = px.y / px.x; vec2 asp = vec2(ar, 1.);
   float ey = (L[0].y + L[1].y) * .5, hw = max(abs(L[4].x - L[3].x) * .5, .01), cx = (L[3].x + L[4].x) * .5;
   if (fa > .001) {
     float ed = length((L[1] - L[0]) * asp);
@@ -615,17 +615,19 @@ void main() {
       vec2 e = L[i];
       float r = length((uv - e) * asp / ed / vec2(.30, .21));
       float w = 1. - smoothstep(0., 1., r);
-      uv = e + (uv - e) * (1. - vec2(.07, .17) * w * fa);
+      uv = e + (uv - e) * (1. - vec2(.10, .24) * w * fa);
     }
     float t = (uv.y - ey) / max(L[2].y - ey, .01), dx = uv.x - cx, a = abs(dx) / hw;
     float bell = smoothstep(.4, .75, t) * (1. - smoothstep(.95, 1.1, t));
     float bump = smoothstep(0., .7, a) * (1. - smoothstep(1., 1.6, a));
-    uv.x += sign(dx) * .09 * hw * bell * bump * fa;
+    float chin = smoothstep(.75, 1., t) * (1. - smoothstep(1.02, 1.2, t)) * (1. - smoothstep(.2, .7, a));
+    uv.x += sign(dx) * (.13 * bell * bump + .10 * chin * smoothstep(0., .3, a)) * hw * fa;
+    uv.y += .035 * hw * chin * fa;
   }
   vec3 c = texture(F, uv).rgb;
   float sk = 0.;
-  if (sm > 0. || fa > .001) sk = skinOf(textureLod(F, uv, 3.).rgb);
-  if (sm > 0. && sk > .01) {
+  if (smx > 0. || fa > .001) sk = skinOf(textureLod(F, uv, 3.).rgb);
+  if (smx > 0. && sk > .01) {
     float R = 9. / (px.y * 720.);
     vec3 acc = c; float ws = 1.;
     for (int i = 0; i < 20; i++) {
@@ -633,28 +635,37 @@ void main() {
       vec3 s = textureLod(F, uv + vec2(cos(an), sin(an)) * rr * px, 0.).rgb, d = s - c;
       float w = exp(-dot(d, d) * 45.); acc += s * w; ws += w;
     }
-    c = mix(c, acc / ws, sk * sm);
-    c = pow(c, vec3(1. - .16 * sk * sm, 1. - .13 * sk * sm, 1. - .09 * sk * sm));
+    c = mix(c, acc / ws, sk * smx);
+    c = pow(c, vec3(1. - .16 * sk * smx, 1. - .13 * sk * smx, 1. - .09 * sk * smx));
   }
   if (fa > .001) {
-    float W = hw * 2. * ar, fh = max(L[2].y - ey, .01);
+    float ed2 = max(length((L[1] - L[0]) * asp), .01), W = hw * 2. * ar, fh = max(L[2].y - ey, .01);
     float fm = 1. - smoothstep(.65, 1.05, length((uv - vec2(cx, ey + fh * .42)) / vec2(hw * 1.05, fh * .95)));
-    c = pow(c, vec3(1. - .07 * fm * sk * fa));
+    c = pow(c, vec3(1. - .12 * fm * sk * fa));
     float blush = 0.;
     for (int i = 3; i < 5; i++) {
       vec2 bc = vec2(mix(L[i].x, L[5].x, .5), mix(ey, L[5].y, .85));
-      vec2 q = (uv - bc) * asp / (W * vec2(.2, .11));
-      blush = max(blush, exp(-2.2 * dot(q, q)));
+      vec2 q = (uv - bc) * asp / (W * vec2(.23, .13));
+      blush = max(blush, exp(-2. * dot(q, q)));
     }
-    c = mix(c, c * vec3(1.04, .80, .85) + vec3(.06, .005, .025), blush * (.35 + .65 * sk) * .8 * fa);
+    vec2 br = (uv - vec2(cx, ey + (L[5].y - ey) * .3)) * asp / (W * vec2(.2, .07));
+    blush = max(blush, .55 * exp(-2. * dot(br, br)));
+    c = mix(c, c * vec3(1.04, .80, .85) + vec3(.06, .005, .025), blush * (.35 + .65 * sk) * .95 * fa);
     vec2 nq = (uv - L[5]) * asp / (W * .07);
     float nose = exp(-2. * dot(nq, nq));
     c = mix(c, c * vec3(1.03, .88, .9) + vec3(.03, .0, .01), nose * .5 * fa);
     vec2 d = (uv - L[6]) / (L[7] + .0005);
     float lm = (1. - smoothstep(.55, 1., dot(d, d))) * smoothstep(.05, .16, c.r - c.g);
-    c = mix(c, c * vec3(1.1, .74, .84) + vec3(.07, .0, .02), lm * .62 * fa);
+    c = mix(c, c * vec3(1.1, .74, .84) + vec3(.07, .0, .02), lm * (.55 + .3 * (1. - smoothstep(0., 1., dot(d, d)))) * fa);
     vec2 g = (uv - (L[6] + vec2(0., L[7].y * .38))) / (L[7] * vec2(.38, .2) + .0005);
-    c += exp(-2. * dot(g, g)) * lm * .16 * fa;
+    c += exp(-2. * dot(g, g)) * lm * .24 * fa;
+    for (int i = 0; i < 2; i++) {   // mắt long lanh: viền mống mắt đậm + điểm sáng
+      vec2 q = (uv - L[i]) * asp / ed2;
+      float rr = length(q);
+      c *= 1. - .28 * smoothstep(.06, .095, rr) * (1. - smoothstep(.105, .135, rr)) * fa;
+      vec2 hq = (q - vec2(-.03, -.035)) / .022;
+      c += exp(-dot(hq, hq)) * .35 * fa;
+    }
     c = clamp(c, 0., 1.);
   }
   if (bg > 0 && hasM > .5) {
